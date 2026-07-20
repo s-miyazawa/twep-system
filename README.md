@@ -26,6 +26,12 @@ The platform has two primary backends:
 Both backends use the same `no_std` Wasm binaries and the same CBOR application
 ABI. Platform-specific behavior is implemented behind the `twep-wr` boundary.
 
+The following diagram shows the TrustZone (OP-TEE) backend, including the
+relationships between REE commands and daemon components, the TEE-side TA and
+TEEP Agent, and OP-TEE secure storage:
+
+![TrustZone (OP-TEE) backend architecture](docs/optee_trustzone_production.svg)
+
 ## Security status
 
 The repository includes mock and explicitly insecure AttesTAM demonstration
