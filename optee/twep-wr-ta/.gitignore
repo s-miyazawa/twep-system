@@ -1,0 +1,14 @@
+.codex-artifacts/
+host/*.o
+host/optee_example_twep_wr_ta
+guest/
+ta/.*.cmd
+ta/.*.d
+ta/*.dmp
+ta/*.elf
+ta/*.map
+ta/*.o
+ta/*.stripped.elf
+ta/*.ta
+ta/dyn_list
+ta/ta.lds

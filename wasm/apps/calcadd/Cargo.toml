@@ -1,0 +1,12 @@
+[package]
+name = "twep-calcadd"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-2-Clause"
+repository = "https://github.com/s-miyazawa/twep-system"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+panic = "abort"

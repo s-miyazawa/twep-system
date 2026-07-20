@@ -1,0 +1,6 @@
+github.com/fxamacker/cbor/v2 v2.9.0 h1:NpKPmjDBgUfBms6tr6JZkTHtfFGcMKsw3eGcmD/sapM=
+github.com/fxamacker/cbor/v2 v2.9.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
+github.com/kentakayama/go-cose v0.0.0-20260122035816-b936aa60847b h1:/dMLvhdR13tA0dIpB9WKhjtR2O3+tb/PzCuUqNHzdKo=
+github.com/kentakayama/go-cose v0.0.0-20260122035816-b936aa60847b/go.mod h1:PYGaGDvfZdgzCWZodC+oRl8k/6mI41zi426B7M9ZEaE=
+github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
+github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=

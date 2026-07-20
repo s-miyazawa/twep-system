@@ -1,0 +1,18 @@
+[package]
+name = "twep-negaposi"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-2-Clause"
+repository = "https://github.com/s-miyazawa/twep-system"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+
+[dependencies]
+jpeg-encoder = { version = "0.6", default-features = false }
+zune-jpeg = { version = "0.4", default-features = false }

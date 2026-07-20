@@ -1,0 +1,78 @@
+/ unsigned corim / 501({
+    / id / 0: h'7365636D67656E657269636561740001',
+    / tags / 1: [
+        << / concise-mid-tag / 506({
+            / language / 0: "en-GB",
+            / tag-identity / 1: {
+                / rag-id / 0: h'7365636D67656E657269636561740002'
+            },
+            / entities / 2: [
+                {
+                    / entity-name / 0: "twep",
+                    / reg-id / 1: 32("https://twep.example"),
+                    / role / 2: [
+                        0,
+                        1,
+                        2
+                    ]
+                }
+            ],
+            / triples / 4: {
+                / reference-triples / 0: [
+                    [
+                        {
+                            / instance / 1: 550(h'0198F50A4FF6C05861C8860D13A638EA')
+                        },
+                        [
+                            {
+                                / mval / 1: {
+                                    / version / 0: {
+                                        / version / 0: "1.3.4",
+                                        / version-scheme / 1: 1
+                                    },
+                                    / digests / 2: [
+                                        [
+                                            1,
+                                            h'DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF'
+                                        ]
+                                    ],
+                                    / name / 11: "TEEP Agent"
+                                }
+                            }
+                        ]
+                    ]
+                ]
+            }
+        }) >>,
+        << / concise-mid-tag / 506({
+            / language / 0: "en-GB",
+            / tag-identity / 1: {
+                / rag-id / 0: h'7365636D67656E657269636561740002'
+            },
+            / entities / 2: [
+                {
+                    / entity-name / 0: "twep",
+                    / reg-id / 1: 32("https://twep.example"),
+                    / role / 2: [
+                        0,
+                        1,
+                        2
+                    ]
+                }
+            ],
+            / triples / 4: {
+                / attest-key-triples / 3: [
+                    [
+                        {
+                            / instance / 1: 550(h'0198F50A4FF6C05861C8860D13A638EA')
+                        },
+                        [
+                            / tagged-pkix-base64-key-type / 554("-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMKBCTNIcKUSDii11ySs3526iDZ8A\niTo7Tu6KPAqv7D7gS2XpJFbZiItSs3m9+9Ue6GnvHw/GW2ZZaVtszggXIw==\n-----END PUBLIC KEY-----")
+                        ]
+                    ]
+                ]
+            }
+        }) >>
+    ],
+    / profile / 3: "http://example.com/corim/profile"
+})

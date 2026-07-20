@@ -1,0 +1,23 @@
+bin/
+build/
+wasm/apps/*/target/
+wasm/teep-agent/target/
+wasm/teep-agent/docs/book/
+
+# Local automation and retained test-run evidence
+**/.codex-artifacts/
+
+# Local configuration and environment files
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs, temporary files, and editor/OS metadata
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

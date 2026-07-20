@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2160" height="1384" viewBox="0 0 2160 1384" role="img" aria-labelledby="title desc">
+  <title id="title">TWEP OP-TEE TrustZone Production Connection Path</title>
+  <desc id="desc">Software modules and control, data, host-I/O, continuation, and secure-storage relationships across the OP-TEE TrustZone boundary.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#23354d" flood-opacity="0.14"/>
+    </filter>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0 10 5 0 10z" fill="#2874bb"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0 10 5 0 10z" fill="#388b45"/></marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0 10 5 0 10z" fill="#7150b6"/></marker>
+    <marker id="arrow-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0 10 5 0 10z" fill="#df8a00"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0 10 5 0 10z" fill="#d94236"/></marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0 10 5 0 10z" fill="#586b78"/></marker>
+    <style>
+      text{font-family:Inter,"Noto Sans",Arial,sans-serif;fill:#17202d}.title{font-size:42px;font-weight:800}.subtitle{font-size:21px;fill:#5c6878}.zone{font-size:32px;font-weight:800}.zoneSub{font-size:19px;fill:#5d6877}.boxTitle{font-size:23px;font-weight:750}.body{font-size:18px;fill:#3e4a59}.small{font-size:16px;fill:#465362}.tiny{font-size:14px;fill:#465362}.center{text-anchor:middle}.card{stroke-width:2.4;filter:url(#shadow)}.blueCard{fill:#e7f2ff;stroke:#3c83cf}.greenCard{fill:#e7f5e7;stroke:#4a9a55}.purpleCard{fill:#eee5fa;stroke:#7a58bd}.orangeCard{fill:#fff0cf;stroke:#de8a00}.coralCard{fill:#ffdcd7;stroke:#df5549}.whiteCard{fill:#fff;stroke:#9ba9b8}.solid{fill:none;stroke-width:4}.dashed{fill:none;stroke-width:3;stroke-dasharray:12 10}.blueLine{stroke:#2874bb;marker-end:url(#arrow-blue)}.greenLine{stroke:#388b45;marker-end:url(#arrow-green)}.purpleLine{stroke:#7150b6;marker-end:url(#arrow-purple)}.orangeLine{stroke:#df8a00;marker-end:url(#arrow-orange)}.redLine{stroke:#d94236;marker-end:url(#arrow-red)}.grayLine{stroke:#586b78;marker-end:url(#arrow-gray)}
+    </style>
+  </defs>
+
+  <rect width="2160" height="1384" fill="#f8fafc"/>
+  <text x="1080" y="63" class="title center">TWEP OP-TEE TrustZone Production Connection Path</text>
+  <text x="1080" y="101" class="subtitle center">Left: Normal World / REE process path. Right: Secure World / OP-TEE TA path.</text>
+
+  <rect x="50" y="140" width="950" height="1190" rx="34" fill="#eef7ff" stroke="#66a5e3" stroke-width="3"/>
+  <rect x="1160" y="140" width="950" height="1190" rx="34" fill="#fff1ef" stroke="#eb7b70" stroke-width="3"/>
+  <text x="525" y="202" class="zone center">Normal World / REE</text>
+  <text x="525" y="242" class="zoneSub center">processes, cgo wrapper, libteec, host callbacks</text>
+  <text x="1635" y="202" class="zone center">Secure World / TEE</text>
+  <text x="1635" y="242" class="zoneSub center">OP-TEE trusted application, local runtime, secure objects</text>
+  <path d="M1080 150V1295" stroke="#738292" stroke-width="3" stroke-dasharray="15 12"/>
+  <text x="1080" y="165" class="small center">TrustZone boundary</text>
+  <text x="1080" y="1306" class="small center" font-weight="700">SMC / TEEC invocation crosses here</text>
+
+  <!-- Normal World modules -->
+  <rect x="100" y="295" width="220" height="110" rx="13" class="card blueCard"/>
+  <text x="210" y="338" class="boxTitle center">twep-cli</text><text x="210" y="373" class="body center">user command</text>
+  <rect x="390" y="295" width="220" height="110" rx="13" class="card blueCard"/>
+  <text x="500" y="338" class="boxTitle center">twepd</text><text x="500" y="373" class="body center">Go daemon</text>
+  <rect x="680" y="295" width="260" height="110" rx="13" class="card greenCard"/>
+  <text x="810" y="338" class="boxTitle center">internal/twepwr</text><text x="810" y="373" class="body center">cgo wrapper</text>
+  <path d="M320 350H380" class="solid blueLine"/><text x="350" y="326" class="small center">UDS + CBOR</text>
+  <path d="M610 350H670" class="solid greenLine"/><text x="640" y="326" class="small center">cgo</text>
+
+  <rect x="215" y="500" width="365" height="132" rx="14" class="card purpleCard"/>
+  <text x="397" y="545" class="boxTitle center">libtwep_wr.so</text><text x="397" y="580" class="body center">C ABI v3</text><text x="397" y="610" class="body center">platform/trustzone</text>
+  <rect x="690" y="510" width="210" height="112" rx="13" class="card whiteCard"/>
+  <text x="795" y="553" class="boxTitle center">libteec</text><text x="795" y="589" class="body center">TEEC API</text>
+  <path d="M810 405V450Q810 475 785 475H397V490" class="solid purpleLine"/>
+  <text x="620" y="455" class="small center">twep_wr_execute()</text>
+  <path d="M580 566H680" class="solid grayLine"/><text x="630" y="545" class="small center">TEEC</text>
+
+  <rect x="100" y="760" width="400" height="137" rx="13" class="card whiteCard"/>
+  <text x="300" y="805" class="boxTitle center">state/cache bytes</text>
+  <text x="300" y="840" class="body center">opaque update and app bytes</text><text x="300" y="871" class="body center">Catalog candidate transport</text>
+  <rect x="550" y="760" width="400" height="137" rx="13" class="card whiteCard"/>
+  <text x="750" y="805" class="boxTitle center">host I/O callbacks</text>
+  <text x="750" y="840" class="body center">HTTP/TLS transport</text><text x="750" y="871" class="body center">Evidence broker</text>
+  <path d="M397 632V710H300V750" class="dashed grayLine"/>
+  <path d="M397 710H750V750" class="dashed grayLine"/>
+  <text x="520" y="688" class="small center">REE transports opaque bytes</text>
+
+  <!-- Secure World modules -->
+  <rect x="1420" y="295" width="430" height="150" rx="14" class="card coralCard"/>
+  <text x="1635" y="340" class="boxTitle center">twep-wr TA</text><text x="1635" y="375" class="body center">ta/twep_wr_ta.c</text>
+  <text x="1635" y="412" class="body center">INIT / EXECUTE / RESUME_HOST_IO</text>
+  <path d="M900 566C1025 566 1135 365 1410 365" class="solid redLine"/>
+  <rect x="965" y="390" width="270" height="55" rx="12" class="whiteCard"/>
+  <text x="1100" y="425" class="small center" font-weight="700">TA_TWEP_WR_CMD_EXECUTE</text>
+
+  <text x="1635" y="535" class="body center" font-weight="700">WAMR</text>
+  <path d="M1510 520H1570M1700 520H1760" fill="none" stroke="#17202d" stroke-width="2"/>
+  <path d="M1510 520V535M1760 520V535" fill="none" stroke="#17202d" stroke-width="2"/>
+  <rect x="1230" y="570" width="360" height="140" rx="14" class="card purpleCard"/>
+  <text x="1410" y="615" class="boxTitle center">TA-local TEEP_Agent</text>
+  <text x="1410" y="651" class="body center">Catalog verification and resolution</text><text x="1410" y="682" class="body center">TC / app promotion decisions</text>
+  <rect x="1660" y="570" width="390" height="140" rx="14" class="card orangeCard"/>
+  <text x="1855" y="615" class="boxTitle center">TA-local app runtime</text>
+  <text x="1855" y="651" class="body center">helloworld / calcadd / negaposi</text><text x="1855" y="682" class="body center">twep-app-v1 ABI</text>
+  <path d="M1540 445L1430 560" class="solid purpleLine"/><text x="1430" y="510" class="small center">resolve + authorize</text>
+  <path d="M1730 445L1835 560" class="solid orangeLine"/><text x="1825" y="510" class="small center">execute app</text>
+
+  <rect x="1230" y="850" width="335" height="145" rx="14" class="card whiteCard"/>
+  <text x="1397" y="895" class="boxTitle center">host I/O requests</text>
+  <text x="1397" y="930" class="body center">read/write state object</text><text x="1397" y="963" class="body center">http_post / create_evidence</text>
+  <rect x="1710" y="850" width="350" height="145" rx="14" class="card coralCard"/>
+  <text x="1885" y="895" class="boxTitle center">Continuation state</text>
+  <text x="1885" y="930" class="body center">request_id, io_id</text><text x="1885" y="963" class="body center">transcript binding</text>
+  <path d="M1410 710V840" class="dashed grayLine"/><text x="1465" y="790" class="small">need_host_io</text>
+  <path d="M1230 925C1110 925 1030 900 960 865" class="dashed grayLine"/>
+  <path d="M750 897C980 1080 1450 1060 1700 925" class="dashed redLine"/>
+  <text x="1630" y="906" class="small center">RESUME_HOST_IO</text>
+  <path d="M1855 710V840" class="solid orangeLine"/><text x="1930" y="790" class="small">app output CBOR</text>
+
+  <rect x="1400" y="1110" width="460" height="155" rx="14" class="card whiteCard"/>
+  <text x="1630" y="1154" class="boxTitle center">OP-TEE persistent objects</text>
+  <text x="1630" y="1188" class="body center">REE FS Secure Storage</text>
+  <text x="1630" y="1220" class="body center">protected Catalog state</text><text x="1630" y="1251" class="body center">acceptance state · credentials</text>
+  <path d="M1885 995V1055H1630V1100" class="dashed grayLine"/><text x="1770" y="1040" class="small center">protected object API</text>
+
+  <!-- Legend -->
+  <rect x="80" y="985" width="800" height="285" rx="17" class="card whiteCard" stroke="#4d94d8"/>
+  <text x="105" y="1025" class="boxTitle">Legend</text>
+  <line x1="480" y1="1045" x2="480" y2="1245" stroke="#c1cad4" stroke-width="2"/>
+  <g class="small">
+    <rect x="105" y="1050" width="45" height="25" rx="4" class="blueCard"/><text x="170" y="1069">Blue — REE process</text>
+    <rect x="105" y="1087" width="45" height="25" rx="4" class="greenCard"/><text x="170" y="1106">Green — Go/C adapter</text>
+    <rect x="105" y="1124" width="45" height="25" rx="4" class="purpleCard"/><text x="170" y="1143">Purple — TWEP runtime or policy module</text>
+    <rect x="105" y="1161" width="45" height="25" rx="4" class="orangeCard"/><text x="170" y="1180">Orange — Trusted Wasm app runtime</text>
+    <rect x="105" y="1198" width="45" height="25" rx="4" class="coralCard"/><text x="170" y="1217">Coral — TA control or continuation</text>
+    <rect x="105" y="1235" width="45" height="25" rx="4" class="whiteCard"/><text x="170" y="1254">White — Platform interface, I/O, or state</text>
+  </g>
+  <path d="M515 1065H585" class="solid grayLine"/><text x="605" y="1062" class="small">Solid arrow — Direct call or</text><text x="605" y="1087" class="small">execution dispatch</text>
+  <path d="M515 1135H585" class="dashed grayLine"/><text x="605" y="1132" class="small">Gray dashed arrow — Opaque</text><text x="605" y="1157" class="small">data, host I/O, or storage transfer</text>
+  <path d="M515 1210H585" class="dashed redLine"/><text x="605" y="1207" class="small">Red dashed arrow — Continuation</text><text x="605" y="1232" class="small">resume path</text>
+</svg>
