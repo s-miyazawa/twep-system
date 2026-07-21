@@ -3,6 +3,7 @@
 #ifndef TWEP_WR_TA_INTERNAL_H
 #define TWEP_WR_TA_INTERNAL_H
 
+#include <stdbool.h>
 #include <tee_internal_api.h>
 
 #if defined(__GNUC__)
@@ -38,6 +39,11 @@ TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_production_envelope(
 	const char *);
 #ifdef TWEP_TA_D043_TEST_HOOKS
 TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_d043_test(uint32_t, TEE_Param[4]);
+#endif
+#ifdef TWEP_TA_WAMR_LINK
+TWEP_TA_HIDDEN bool twep_ta_ensure_wamr_runtime(void);
+TWEP_TA_HIDDEN void twep_ta_wamr_cleanup_if_idle(void);
+TWEP_TA_HIDDEN bool twep_ta_wasm_has_import_section(const void *, size_t);
 #endif
 
 #endif /* TWEP_WR_TA_INTERNAL_H */

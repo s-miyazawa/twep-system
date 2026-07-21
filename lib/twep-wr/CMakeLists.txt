@@ -40,7 +40,12 @@ if(TWEP_WR_PLATFORM_BACKEND STREQUAL "linux")
 elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "trustzone")
   set(TWEP_WR_PLATFORM_SOURCE
         src/platform/trustzone/platform_trustzone.c
+        src/platform/trustzone/trustzone_artifacts.c
+        src/platform/trustzone/trustzone_candidate.c
+        src/platform/trustzone/trustzone_diagnostics.c
         src/platform/trustzone/trustzone_envelope.c
+        src/platform/trustzone/trustzone_host_io.c
+        src/platform/trustzone/trustzone_session_storage.c
         src/platform/trustzone/trustzone_storage.c
         src/platform/trustzone/trustzone_transport.c
   )

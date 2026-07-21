@@ -4,6 +4,8 @@
 global-incdirs-y += include
 srcs-y += twep_wr_ta.c
 srcs-y += ta_command_router.c
+srcs-y += ta_basic_commands.c
+srcs-y += ta_wamr_spike.c
 srcs-y += acceptance_state.c
 
 ifeq ($(TWEP_TA_D043_TEST_HOOKS),1)
