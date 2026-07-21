@@ -126,7 +126,13 @@ flowchart TB
         subgraph tadir["ta/"]
             taheader["include/twep_wr_ta.h\nUUID and command IDs 0-11"]
             tac["twep_wr_ta.c\nTA lifecycle entry points"]
-            taproduction["ta_production_runtime.c\nproduction envelope, WAMR, host-I/O"]
+            taproduction["ta_production_runtime.c\nproduction command lifecycle"]
+            taruntimeinternal["ta_runtime_internal.h\nprivate runtime contracts and session context"]
+            tacbor["ta_runtime_cbor.c\nexecute/resume CBOR envelopes"]
+            tahostio["ta_host_io_continuation.c\nhost-I/O continuation and transcript binding"]
+            taapp["ta_app_runtime.c\ngeneral app WAMR execution"]
+            tahostcalls["ta_teep_hostcalls.c\nTEEP Agent native hostcalls"]
+            tateepruntime["ta_teep_runtime.c\nTEEP Agent WAMR coordination"]
             tarouter["ta_command_router.c\ncommand ID routing table"]
             tabasic["ta_basic_commands.c\nbasic smoke commands"]
             tastorage["ta_secure_storage.c\nmeasurement and generic storage adapter"]
@@ -138,6 +144,12 @@ flowchart TB
         end
 
         tac --> taproduction
+        taproduction --> taruntimeinternal
+        taproduction --> tacbor
+        taproduction --> tahostio
+        taproduction --> taapp
+        taproduction --> tateepruntime
+        tateepruntime --> tahostcalls
 
         subgraph wamrdir["wamr-ta/"]
             wamrcmake["CMakeLists.txt\nbuild TA-safe iwasm archive"]

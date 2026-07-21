@@ -2114,6 +2114,38 @@ static void expect_execute_failure(struct twep_ta_ctx *ctx,
 	       label, res, origin);
 }
 
+static void expect_execute_output_limit_error(struct twep_ta_ctx *ctx,
+					      const char *wasm_path)
+{
+	uint8_t *wasm = NULL;
+	uint8_t *request = NULL;
+	uint8_t response[4096];
+	size_t wasm_len = 0;
+	size_t request_len = 0;
+	size_t response_len = 0;
+	TEEC_Result res;
+	uint32_t origin = 0;
+
+	wasm = read_file(wasm_path, &wasm_len);
+	request = make_execute_envelope("req-production-cleanup-negative",
+					"helloworld", NULL, 0, wasm,
+					wasm_len, &request_len);
+	res = invoke_production_raw(ctx, TA_TWEP_WR_CMD_EXECUTE, request,
+				    request_len, response, sizeof(response),
+				    &response_len, &origin);
+	free(request);
+	free(wasm);
+	if (res != TEEC_SUCCESS)
+		errx(1, "TA production execute oversized app output returned code 0x%x origin 0x%x",
+		     res, origin);
+	if (!validate_app_runtime_error_response(
+		    response, response_len, "req-production-cleanup-negative",
+		    "helloworld", "app.resource_limit",
+		    "resource limit exceeded", "max_output_bytes"))
+		errx(1, "TA production execute returned unexpected oversized app output response");
+	puts("TA production execute rejected oversized app output with structured app.resource_limit");
+}
+
 static void invoke_execute_cleanup_negative(struct twep_ta_ctx *ctx,
 					    const char *helloworld_wasm_path,
 					    const char *nonzero_wasm_path,
@@ -2149,8 +2181,7 @@ static void invoke_execute_cleanup_negative(struct twep_ta_ctx *ctx,
 
 	expect_execute_failure(ctx, nonzero_wasm_path, "nonzero app status",
 			       TEEC_ERROR_GENERIC);
-	expect_execute_failure(ctx, oversized_wasm_path, "oversized app output",
-			       TEEC_ERROR_BAD_FORMAT);
+	expect_execute_output_limit_error(ctx, oversized_wasm_path);
 	expect_execute_failure(ctx, trap_wasm_path, "trap app",
 			       TEEC_ERROR_BAD_FORMAT);
 	invoke_execute_helloworld(ctx, helloworld_wasm_path);

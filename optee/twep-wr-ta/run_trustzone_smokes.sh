@@ -534,15 +534,24 @@ run_host_io_resume_negative() {
 
 run_sha256_boundary_negative() {
 	log="/tmp/twep-trustzone-sha256-boundary-negative.log"
+	host_io_source="${PROJECT_DIR}/ta/ta_host_io_continuation.c"
 	: >"${log}"
-	grep -q "request_body_sha256" "${PROJECT_DIR}/ta/ta_production_runtime.c"
-	grep -q "normalized_input_sha256" "${PROJECT_DIR}/ta/ta_production_runtime.c"
-	if grep -nE "payload_sha256|payload hash|app.hash|catalog.*sha|sha.*catalog|SUIT payload" "${PROJECT_DIR}/ta/ta_production_runtime.c" >>"${log}"; then
+	grep -q "request_body_sha256" "${host_io_source}"
+	grep -q "normalized_input_sha256" "${host_io_source}"
+	# Catalog commit digests bind the protected D047 transaction; they do not
+	# authorize Catalog or app content. Trust hashes remain TEEP Agent-owned.
+	if grep -nE "payload_sha256|payload hash|app.hash|SUIT payload" \
+		"${PROJECT_DIR}"/ta/ta_production_runtime.c \
+		"${PROJECT_DIR}"/ta/ta_runtime_cbor.c \
+		"${PROJECT_DIR}"/ta/ta_host_io_continuation.c \
+		"${PROJECT_DIR}"/ta/ta_app_runtime.c \
+		"${PROJECT_DIR}"/ta/ta_teep_hostcalls.c \
+		"${PROJECT_DIR}"/ta/ta_teep_runtime.c >>"${log}"; then
 		cat "${log}"
-		echo "TA C SHA-256 boundary violation: catalog/app trust hash found"
+		echo "TA C SHA-256 boundary violation: Catalog/app authorization hash found"
 		exit 1
 	fi
-	echo "TA C SHA-256 boundary kept to host I/O transcript binding" | tee -a "${log}"
+	echo "TA C SHA-256 boundary kept to transport and protected-commit binding" | tee -a "${log}"
 	echo "TrustZone TA SHA-256 boundary negative ok" | tee -a "${log}"
 }
 

@@ -78,7 +78,8 @@ hostcalls.
   ESP256 signing.
 - `src/suit.rs`: SUIT manifest parsing, component-id classification, payload
   digest checks, and install metadata generation.
-- `src/verified.rs`: `attestam-verified` dry-run state and artifact generation.
+- `src/verified.rs` and `src/verified/`: verified-mode coordination, state,
+  credentials/policy, live acceptance, diagnostics, and focused test modules.
 - `src/credential_management.rs`, `src/protected_credentials.rs`,
   `src/freshness.rs`, `src/evidence.rs`: verified-mode credential, freshness,
   and evidence support.

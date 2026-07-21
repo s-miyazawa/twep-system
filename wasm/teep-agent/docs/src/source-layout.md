@@ -18,10 +18,24 @@ wasm/teep-agent/
     ├── host_io.rs
     ├── catalog.rs
     ├── session.rs
+    ├── session/
+    │   ├── exchange.rs
+    │   ├── insecure_install.rs
+    │   ├── live.rs
+    │   └── observation.rs
     ├── teep.rs
     ├── cose.rs
     ├── suit.rs
     ├── verified.rs
+    ├── verified/
+    │   ├── agent_identity.rs
+    │   ├── credentials.rs
+    │   ├── diagnostics.rs
+    │   ├── dry_run.rs
+    │   ├── evidence_status.rs
+    │   ├── live_acceptance.rs
+    │   ├── state.rs
+    │   └── tests/
     ├── credential_management.rs
     ├── protected_credentials.rs
     ├── freshness.rs
@@ -36,11 +50,11 @@ wasm/teep-agent/
 | `lib.rs` | `twep-app-v1` export, bump allocator, input dispatch, common CBOR error output |
 | `host_io.rs` | Rust wrapper for `twep_teep_env` hostcalls |
 | `catalog.rs` | Catalog File parsing, app entry validation, Wasm payload hash verification, `resolve_app` output generation |
-| `session.rs` | `mock` / `attestam-insecure` resolution, TEEP session, Update staging/install/promotion |
+| `session.rs` / `session/` | Session coordination, TEEP exchange, insecure staging/install, live flow, and observation persistence |
 | `teep.rs` | TEEP message type, token, QueryResponse payload, Update `manifest-list` extraction |
 | `cose.rs` | COSE_Sign1 parsing, payload extraction, ESP256 verification adapter, development signing |
 | `suit.rs` | SUIT envelope/manifest parsing, component-id classification, payload digest verification, Success report |
-| `verified.rs` | `attestam-verified` dry-run, verification-step state, diagnostic artifact generation |
+| `verified.rs` / `verified/` | `attestam-verified` coordination, verification state, credentials/policy, live acceptance, diagnostics, and focused tests |
 | `credential_management.rs` | Parsing credential/policy state and diagnosing trust-anchor binding |
 | `protected_credentials.rs` | Detailed validation of the protected credential-store schema |
 | `freshness.rs` | CBOR processing for reading and writing the sequence-freshness map |
