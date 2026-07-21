@@ -29,6 +29,7 @@ struct host_io_transcript {
 
 static uint8_t *read_file(const char *path, size_t *out_len);
 static int validate_helloworld_app_output(const uint8_t *bytes, size_t len);
+static void invoke_abi_vectors(struct twep_ta_ctx *ctx, const char *path);
 
 static const uint8_t wamr_spike_helloworld_input[] = {
 	0xa1,
@@ -4396,6 +4397,111 @@ static uint8_t *read_file(const char *path, size_t *out_len)
 	return buf;
 }
 
+static uint8_t hex_nibble(uint8_t ch, const char *name)
+{
+	if (ch >= '0' && ch <= '9')
+		return ch - '0';
+	if (ch >= 'a' && ch <= 'f')
+		return (uint8_t)(ch - 'a' + 10);
+	errx(1, "ABI vector %s contains non-lowercase-hex byte 0x%02x",
+	     name, ch);
+}
+
+static uint8_t *read_named_abi_vector(const uint8_t *file, size_t file_len,
+				      const char *name, size_t *out_len)
+{
+	size_t name_len = strlen(name);
+	size_t line = 0;
+
+	while (line < file_len) {
+		size_t end = line;
+		size_t hex_start;
+		size_t hex_len;
+		uint8_t *bytes;
+		size_t i;
+
+		while (end < file_len && file[end] != '\n')
+			end++;
+		if (end > line && file[end - 1] == '\r')
+			end--;
+		if (end > line && file[line] != '#' &&
+		    end - line > name_len && file[line + name_len] == '|' &&
+		    memcmp(file + line, name, name_len) == 0) {
+			hex_start = line + name_len + 1;
+			hex_len = end - hex_start;
+			if (hex_len == 0 || (hex_len & 1) != 0)
+				errx(1, "ABI vector %s has invalid hex length", name);
+			bytes = malloc(hex_len / 2);
+			if (!bytes)
+				err(1, "allocate ABI vector %s", name);
+			for (i = 0; i < hex_len; i += 2) {
+				bytes[i / 2] =
+					(uint8_t)(hex_nibble(file[hex_start + i], name) << 4) |
+					hex_nibble(file[hex_start + i + 1], name);
+			}
+			*out_len = hex_len / 2;
+			return bytes;
+		}
+		line = end < file_len ? end + 1 : file_len;
+	}
+	errx(1, "ABI vector %s not found", name);
+}
+
+static void invoke_abi_vectors(struct twep_ta_ctx *ctx, const char *path)
+{
+	static const char *const names[] = {
+		"public-request",
+		"public-response",
+		"agent-resolve-request",
+		"agent-resolve-response",
+		"trustzone-execute-envelope",
+		"trustzone-resume-envelope",
+	};
+	uint8_t *file;
+	uint8_t *execute = NULL;
+	uint8_t *resume = NULL;
+	uint8_t response[128];
+	size_t file_len = 0;
+	size_t execute_len = 0;
+	size_t resume_len = 0;
+	size_t response_len = 0;
+	uint32_t origin = 0;
+	TEEC_Result res;
+	size_t i;
+
+	file = read_file(path, &file_len);
+	for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+		uint8_t *vector;
+		size_t vector_len = 0;
+
+		vector = read_named_abi_vector(file, file_len, names[i],
+					       &vector_len);
+		if (vector_len == 0)
+			errx(1, "ABI vector %s is empty", names[i]);
+		free(vector);
+	}
+	execute = read_named_abi_vector(file, file_len,
+					"trustzone-execute-envelope",
+					&execute_len);
+	resume = read_named_abi_vector(file, file_len,
+				       "trustzone-resume-envelope", &resume_len);
+
+	expect_production_success(ctx, TA_TWEP_WR_CMD_EXECUTE,
+				  "canonical vector execute", execute,
+				  execute_len);
+	res = invoke_production_raw(ctx, TA_TWEP_WR_CMD_RESUME_HOST_IO,
+				    resume, resume_len, response,
+				    sizeof(response), &response_len, &origin);
+	if (res != TEEC_ERROR_BAD_FORMAT)
+		errx(1, "canonical resume vector without pending request returned code 0x%x origin 0x%x",
+		     res, origin);
+
+	free(resume);
+	free(execute);
+	free(file);
+	puts("TA canonical ABI vectors parsed from shared bytes ok");
+}
+
 static void invoke_provision(struct twep_ta_ctx *ctx, const char *name,
 			     const char *path)
 {
@@ -4435,7 +4541,7 @@ static void invoke_read_object_small(struct twep_ta_ctx *ctx, const char *name)
 static void usage(const char *argv0)
 {
 	fprintf(stderr,
-		"usage: %s [smoke|status|random-time|cbor-dry-run|execute-abi-negative|execute-helloworld <helloworld.wasm>|execute-calcadd <calcadd.wasm>|execute-negaposi <negaposi.wasm> <input.jpg>|execute-hostcall-negative <env-import.wasm> <teep-env-import.wasm>|execute-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm> <oversized-output.wasm>|execute-catalog-resource-negative <teep-agent.wasm> <catalog.cbor> <negaposi.wasm> <input.jpg>|teep-agent-resolve <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-hash-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-catalog-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-wrapped-error-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|host-io-resume|host-io-resume-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-http-wasm <teep-agent.wasm>|teep-agent-hostcall-evidence-wasm <teep-agent.wasm>|teep-agent-acceptance-probe <teep-agent.wasm>|teep-agent-hostcall-object-negative <teep-agent.wasm>|wamr-spike <helloworld.wasm>|wamr-spike-expect-reject <unsupported.wasm>|wamr-spike-input-negative <helloworld.wasm>|wamr-spike-output-negative <helloworld.wasm> <oversized-output.wasm>|wamr-spike-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm>|provision <object> <file>|read <object>|read-small <object>]\n",
+		"usage: %s [smoke|status|random-time|cbor-dry-run|abi-vectors <vectors.hex>|execute-abi-negative|execute-helloworld <helloworld.wasm>|execute-calcadd <calcadd.wasm>|execute-negaposi <negaposi.wasm> <input.jpg>|execute-hostcall-negative <env-import.wasm> <teep-env-import.wasm>|execute-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm> <oversized-output.wasm>|execute-catalog-resource-negative <teep-agent.wasm> <catalog.cbor> <negaposi.wasm> <input.jpg>|teep-agent-resolve <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-hash-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-catalog-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-wrapped-error-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|host-io-resume|host-io-resume-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-http-wasm <teep-agent.wasm>|teep-agent-hostcall-evidence-wasm <teep-agent.wasm>|teep-agent-acceptance-probe <teep-agent.wasm>|teep-agent-hostcall-object-negative <teep-agent.wasm>|wamr-spike <helloworld.wasm>|wamr-spike-expect-reject <unsupported.wasm>|wamr-spike-input-negative <helloworld.wasm>|wamr-spike-output-negative <helloworld.wasm> <oversized-output.wasm>|wamr-spike-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm>|provision <object> <file>|read <object>|read-small <object>]\n",
 		argv0);
 #ifdef TWEP_TA_D043_TEST_HOOKS
 	fprintf(stderr,
@@ -4465,6 +4571,8 @@ int main(int argc, char *argv[])
 		invoke_time_smoke(&ctx);
 	} else if (argc == 2 && strcmp(argv[1], "cbor-dry-run") == 0) {
 		invoke_cbor_dry_run_smoke(&ctx);
+	} else if (argc == 3 && strcmp(argv[1], "abi-vectors") == 0) {
+		invoke_abi_vectors(&ctx, argv[2]);
 	} else if (argc == 2 && strcmp(argv[1], "execute-abi-negative") == 0) {
 		invoke_execute_abi_negative(&ctx);
 	} else if (argc == 3 && strcmp(argv[1], "execute-helloworld") == 0) {

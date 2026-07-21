@@ -8,7 +8,7 @@ PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=optee_example_twep_wr_ta
 
 usage() {
-	echo "usage: $0 [default|diagnose|provision|failures|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
+	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
 }
 
 reset_guest_secure_storage() {
@@ -58,6 +58,17 @@ run_execute_abi_negative() {
 	grep -q "TA unsupported command rejected" "/tmp/twep-trustzone-execute-abi-negative.log"
 	cat "/tmp/twep-trustzone-execute-abi-negative.log"
 	echo "TrustZone TA execute ABI negative ok"
+}
+
+run_abi_vectors() {
+	"${APP}" abi-vectors "${PROJECT_DIR}/guest/fixtures/abi-vectors.hex" \
+		>"/tmp/twep-trustzone-abi-vectors.log"
+	grep -q "TA production canonical vector execute envelope parsed" \
+		"/tmp/twep-trustzone-abi-vectors.log"
+	grep -q "TA canonical ABI vectors parsed from shared bytes ok" \
+		"/tmp/twep-trustzone-abi-vectors.log"
+	cat "/tmp/twep-trustzone-abi-vectors.log"
+	echo "TrustZone canonical ABI vectors ok"
 }
 
 run_execute_helloworld() {
@@ -712,6 +723,9 @@ provision)
 	;;
 failures)
 	run_failure_smoke
+	;;
+abi-vectors)
+	run_abi_vectors
 	;;
 execute-abi-negative)
 	run_execute_abi_negative

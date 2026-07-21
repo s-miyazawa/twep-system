@@ -30,29 +30,6 @@
 #define TEEP_AGENT_HOST_IO_RESPONSE_SIZE_MAX \
 	(TEEP_AGENT_TRANSCRIPT_SIZE_MAX + 1024)
 
-static bool d047_object_name_reserved(const char *name, uint32_t name_len)
-{
-	static const char *const reserved[] = {
-		"twep-catalog-state.cbor",
-		"twep-catalog-state.0.cbor",
-		"twep-catalog-state.1.cbor",
-		"teep-agent/twep-catalog-state.cbor",
-		"teep-agent/twep-catalog-state.0.cbor",
-		"teep-agent/twep-catalog-state.1.cbor",
-	};
-	size_t i = 0;
-
-	if (!name)
-		return false;
-	for (i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++) {
-		size_t len = strlen(reserved[i]);
-
-		if (name_len == len && TEE_MemCompare(name, reserved[i], len) == 0)
-			return true;
-	}
-	return false;
-}
-
 static const uint8_t production_skeleton_response[] = {
 	0xa2,
 	0x66, 's', 't', 'a', 't', 'u', 's',
@@ -186,17 +163,6 @@ struct twep_wr_session {
 static struct twep_wr_session *g_session;
 static size_t g_pending_http_transcript_count;
 static size_t g_pending_http_transcript_bytes;
-#ifdef TWEP_TA_D043_TEST_HOOKS
-static uint32_t g_d043_runtime_test_fault;
-
-static bool take_d043_runtime_test_fault(uint32_t fault)
-{
-	if (g_d043_runtime_test_fault != fault)
-		return false;
-	g_d043_runtime_test_fault = TA_TWEP_WR_D043_FAULT_NONE;
-	return true;
-}
-#endif
 
 #define g_pending_host_io (g_session->pending_host_io)
 
@@ -549,12 +515,14 @@ static bool bytes_view_eq(const struct bytes_view *view, const char *want)
 	       TEE_MemCompare(view->ptr, want, want_len) == 0;
 }
 
+#ifdef TWEP_TA_WAMR_LINK
 static bool object_name_eq(const char *ptr, uint32_t len, const char *want)
 {
 	size_t want_len = strlen(want);
 
 	return len == want_len && TEE_MemCompare(ptr, want, want_len) == 0;
 }
+#endif
 
 #ifdef TWEP_TA_WAMR_LINK
 static bool bytes_view_is_safe_command(const struct bytes_view *view)
@@ -577,8 +545,8 @@ static bool bytes_view_is_safe_command(const struct bytes_view *view)
 }
 #endif
 
-static TEE_Result sha256_bytes(const uint8_t *bytes, size_t len,
-			       uint8_t out[32])
+TEE_Result twep_ta_sha256_bytes(const uint8_t *bytes, size_t len,
+				uint8_t out[32])
 {
 	static const uint8_t empty = 0;
 	TEE_OperationHandle op = TEE_HANDLE_NULL;
@@ -658,11 +626,11 @@ static TEE_Result save_pending_host_io_request(const struct bytes_view *request_
 		return TEE_ERROR_OUT_OF_MEMORY;
 	if (request_body_len)
 		TEE_MemMove(request_body_copy, request_body, request_body_len);
-	res = sha256_bytes(input->ptr, input->len,
+	res = twep_ta_sha256_bytes(input->ptr, input->len,
 			   g_pending_host_io.normalized_input_sha256);
 	if (res != TEE_SUCCESS)
 		goto err;
-	res = sha256_bytes(request_body, request_body_len,
+	res = twep_ta_sha256_bytes(request_body, request_body_len,
 			   g_pending_host_io.request_body_sha256);
 	if (res != TEE_SUCCESS)
 		goto err;
@@ -998,7 +966,7 @@ static TEE_Result pending_teep_live_save(const struct bytes_view *request_id,
 	if (res != TEE_SUCCESS)
 		goto err;
 #ifdef TWEP_TA_D043_TEST_HOOKS
-	if (take_d043_runtime_test_fault(
+	if (twep_ta_take_d043_runtime_test_fault(
 		    TA_TWEP_WR_D043_FAULT_CONTINUATION_ALLOC)) {
 		res = TEE_ERROR_OUT_OF_MEMORY;
 		goto err;
@@ -2199,10 +2167,10 @@ static bool teep_agent_protected_object_allowed(const char *object_name,
 			      "verified-evidence-result.cbor");
 }
 
-static TEE_Result teep_write_persistent_object(const char *object_name,
-					       uint32_t object_name_len,
-					       const uint8_t *data,
-					       uint32_t data_len)
+TEE_Result twep_ta_write_persistent_object(const char *object_name,
+					   uint32_t object_name_len,
+					   const uint8_t *data,
+					   uint32_t data_len)
 {
 	TEE_ObjectHandle object = TEE_HANDLE_NULL;
 	uint32_t flags = TEE_DATA_FLAG_ACCESS_READ |
@@ -2319,7 +2287,7 @@ static int32_t teep_host_write_file(wasm_exec_env_t exec_env, const char *path,
 
 	if (!ctx || !path)
 		return 1;
-	if (d047_object_name_reserved(path, path_len)) {
+	if (twep_ta_d047_object_name_reserved(path, path_len)) {
 		IMSG("twep-wr-ta teep-agent generic catalog-state write rejected");
 		return 4;
 	}
@@ -2554,8 +2522,8 @@ static int32_t teep_host_teep_agent_measurement_sha256(wasm_exec_env_t exec_env,
 		return 2;
 	if (!buf)
 		return 1;
-	res = sha256_bytes(ctx->teep_agent_wasm.ptr, ctx->teep_agent_wasm.len,
-			   digest);
+	res = twep_ta_sha256_bytes(ctx->teep_agent_wasm.ptr,
+				   ctx->teep_agent_wasm.len, digest);
 	if (res != TEE_SUCCESS)
 		return 7;
 	TEE_MemMove(buf, digest, sizeof(digest));
@@ -2615,12 +2583,12 @@ static TEE_Result teep_publish_acceptance_result(uint64_t generation)
 	if (res != TEE_SUCCESS)
 		return res;
 #ifdef TWEP_TA_D043_TEST_HOOKS
-	if (take_d043_runtime_test_fault(
+	if (twep_ta_take_d043_runtime_test_fault(
 		    TA_TWEP_WR_D043_FAULT_RESULT_WRITE))
 		res = TEE_ERROR_STORAGE_NOT_AVAILABLE;
 	else
 #endif
-		res = teep_write_persistent_object("verified-evidence-result.cbor",
+		res = twep_ta_write_persistent_object("verified-evidence-result.cbor",
 				   sizeof("verified-evidence-result.cbor") - 1,
 				   result, result_len);
 	if (res != TEE_SUCCESS)
@@ -2718,7 +2686,8 @@ static int32_t teep_host_commit_catalog(wasm_exec_env_t exec_env,
 		uint64_t current_generation = 0;
 		uint8_t replay_catalog_digest[32] = { };
 
-		res = sha256_bytes(catalog, catalog_len, replay_catalog_digest);
+		res = twep_ta_sha256_bytes(catalog, catalog_len,
+					   replay_catalog_digest);
 		if (res != TEE_SUCCESS ||
 		    sequence != g_pending_teep_live.catalog_commit_sequence ||
 		    expected_generation !=
@@ -2788,130 +2757,22 @@ static int32_t teep_host_commit_catalog(wasm_exec_env_t exec_env,
 }
 
 #ifdef TWEP_TA_D043_TEST_HOOKS
-static TEE_Result d043_test_delete_result(void)
+void twep_ta_pending_diagnostics(uint32_t *flags, uint32_t *count,
+				 uint32_t *bytes)
 {
-	static const char id[] = "verified-evidence-result.cbor";
-	TEE_ObjectHandle object = TEE_HANDLE_NULL;
-	TEE_Result res;
+	uint32_t pending_flags = g_pending_host_io.active ? 1u : 0u;
 
-	res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, id, sizeof(id) - 1,
-				       TEE_DATA_FLAG_ACCESS_WRITE_META, &object);
-	if (res == TEE_ERROR_ITEM_NOT_FOUND)
-		return TEE_SUCCESS;
-	if (res != TEE_SUCCESS)
-		return res;
-	TEE_CloseAndDeletePersistentObject1(object);
-	return TEE_SUCCESS;
-}
-
-TEE_Result twep_ta_cmd_d043_test(uint32_t param_types, TEE_Param params[4])
-{
-	const uint32_t expected = TEE_PARAM_TYPES(
-		TEE_PARAM_TYPE_VALUE_INOUT, TEE_PARAM_TYPE_MEMREF_INPUT,
-		TEE_PARAM_TYPE_VALUE_INOUT, TEE_PARAM_TYPE_NONE);
-	uint32_t op;
-	uint32_t selector;
-	uint64_t generation = 0;
-	TEE_Result res = TEE_SUCCESS;
-
-	if (param_types != expected)
-		return TEE_ERROR_BAD_PARAMETERS;
-	op = params[0].value.a;
-	selector = params[0].value.b;
-	switch (op) {
-	case TA_TWEP_WR_D043_TEST_RESET:
-		g_d043_runtime_test_fault = TA_TWEP_WR_D043_FAULT_NONE;
-		twep_acceptance_test_reset_fault();
-		res = twep_acceptance_test_delete_object(
-			TA_TWEP_WR_D043_OBJECT_SLOT0);
-		if (res == TEE_SUCCESS)
-			res = twep_acceptance_test_delete_object(
-				TA_TWEP_WR_D043_OBJECT_SLOT1);
-		if (res == TEE_SUCCESS)
-			res = twep_acceptance_test_delete_object(
-				TA_TWEP_WR_D043_OBJECT_LEGACY);
-		if (res == TEE_SUCCESS)
-			res = twep_acceptance_test_delete_object(
-				TA_TWEP_WR_D043_OBJECT_CATALOG_SLOT0);
-		if (res == TEE_SUCCESS)
-			res = twep_acceptance_test_delete_object(
-				TA_TWEP_WR_D043_OBJECT_CATALOG_SLOT1);
-		if (res == TEE_SUCCESS)
-			res = d043_test_delete_result();
-		return res;
-	case TA_TWEP_WR_D043_TEST_ARM_FAULT:
-		g_d043_runtime_test_fault = TA_TWEP_WR_D043_FAULT_NONE;
-		twep_acceptance_test_reset_fault();
-		if (selector == TA_TWEP_WR_D043_FAULT_CONTINUATION_ALLOC ||
-		    selector == TA_TWEP_WR_D043_FAULT_RESULT_WRITE) {
-			g_d043_runtime_test_fault = selector;
-			return TEE_SUCCESS;
-		}
-		return twep_acceptance_test_arm_fault(selector);
-	case TA_TWEP_WR_D043_TEST_WRITE_OBJECT:
-		if (selector == TA_TWEP_WR_D043_OBJECT_RESULT)
-			return teep_write_persistent_object(
-				"verified-evidence-result.cbor",
-				sizeof("verified-evidence-result.cbor") - 1,
-				params[1].memref.buffer,
-				params[1].memref.size);
-		return twep_acceptance_test_write_object(
-			selector, params[1].memref.buffer,
-			params[1].memref.size);
-	case TA_TWEP_WR_D043_TEST_DELETE_OBJECT:
-		if (selector == TA_TWEP_WR_D043_OBJECT_RESULT)
-			return d043_test_delete_result();
-		return twep_acceptance_test_delete_object(selector);
-	case TA_TWEP_WR_D043_TEST_GET_GENERATION:
-		res = twep_acceptance_generation(&generation);
-		if (res == TEE_SUCCESS) {
-			params[2].value.a = (uint32_t)generation;
-			params[2].value.b = (uint32_t)(generation >> 32);
-		}
-		return res;
-	case TA_TWEP_WR_D043_TEST_GET_PENDING_STATE:
-		params[0].value.b = g_pending_host_io.active ? 1u : 0u;
 #ifdef TWEP_TA_WAMR_LINK
-		if (g_pending_teep_live.active)
-			params[0].value.b |= 2u;
-		if (g_teep_agent_live_session.active)
-			params[0].value.b |= 4u;
+	if (g_pending_teep_live.active)
+		pending_flags |= 2u;
+	if (g_teep_agent_live_session.active)
+		pending_flags |= 4u;
 #endif
-		params[2].value.a = (uint32_t)g_pending_http_transcript_count;
-		params[2].value.b = (uint32_t)g_pending_http_transcript_bytes;
-		return TEE_SUCCESS;
-	case TA_TWEP_WR_D043_TEST_CATALOG_COMMIT:
-		generation = ((uint64_t)params[2].value.b << 32) |
-			params[2].value.a;
-		res = twep_catalog_test_commit(params[1].memref.buffer,
-					       params[1].memref.size, selector,
-					       generation, &generation);
-		if (res == TEE_SUCCESS) {
-			params[2].value.a = (uint32_t)generation;
-			params[2].value.b = (uint32_t)(generation >> 32);
-		}
-		return res;
-	case TA_TWEP_WR_D043_TEST_CATALOG_EXPECT_ACTIVE:
-		return twep_catalog_test_expect_active(params[1].memref.buffer,
-						       params[1].memref.size);
-	case TA_TWEP_WR_D043_TEST_NONCATALOG_COMMIT:
-		generation = ((uint64_t)params[2].value.b << 32) |
-			params[2].value.a;
-		res = twep_catalog_test_commit_non_catalog(selector, generation,
-							    &generation);
-		if (res == TEE_SUCCESS) {
-			params[2].value.a = (uint32_t)generation;
-			params[2].value.b = (uint32_t)(generation >> 32);
-		}
-		return res;
-	case TA_TWEP_WR_D043_TEST_CATALOG_EXPECT_PRESENT:
-		return twep_catalog_test_expect_active_present();
-	default:
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
+	*flags = pending_flags;
+	*count = (uint32_t)g_pending_http_transcript_count;
+	*bytes = (uint32_t)g_pending_http_transcript_bytes;
 }
 #endif
-
 static int32_t teep_host_random(wasm_exec_env_t exec_env, uint8_t *buf,
 				uint32_t buf_len)
 {
@@ -3387,187 +3248,6 @@ terminal_failure:
 	return res;
 }
 #endif
-
-TEE_Result twep_ta_cmd_measure_wasm(uint32_t param_types,
-				   TEE_Param params[4])
-{
-	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-						 TEE_PARAM_TYPE_MEMREF_OUTPUT,
-						 TEE_PARAM_TYPE_NONE,
-						 TEE_PARAM_TYPE_NONE);
-	uint8_t digest[32] = { 0 };
-	TEE_Result res = TEE_SUCCESS;
-
-	if (param_types != expected)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (params[0].memref.size == 0)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (params[1].memref.size < sizeof(digest)) {
-		params[1].memref.size = sizeof(digest);
-		return TEE_ERROR_SHORT_BUFFER;
-	}
-
-	res = sha256_bytes(params[0].memref.buffer, params[0].memref.size,
-			   digest);
-	if (res != TEE_SUCCESS)
-		return res;
-	TEE_MemMove(params[1].memref.buffer, digest, sizeof(digest));
-	params[1].memref.size = sizeof(digest);
-	IMSG("twep-wr-ta measure wasm");
-	return TEE_SUCCESS;
-}
-
-TEE_Result twep_ta_cmd_secure_storage_put(uint32_t param_types,
-					 TEE_Param params[4])
-{
-	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-						 TEE_PARAM_TYPE_MEMREF_INPUT,
-						 TEE_PARAM_TYPE_NONE,
-						 TEE_PARAM_TYPE_NONE);
-	TEE_ObjectHandle object = TEE_HANDLE_NULL;
-	void *object_id = NULL;
-	void *data = NULL;
-	uint32_t flags = TEE_DATA_FLAG_ACCESS_READ |
-			 TEE_DATA_FLAG_ACCESS_WRITE |
-			 TEE_DATA_FLAG_ACCESS_WRITE_META |
-			 TEE_DATA_FLAG_OVERWRITE;
-	TEE_Result res;
-
-	if (param_types != expected)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (params[0].memref.size == 0 || params[1].memref.size == 0)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (object_name_eq(params[0].memref.buffer, params[0].memref.size,
-			   "verified-evidence-result.cbor") ||
-	    object_name_eq(params[0].memref.buffer, params[0].memref.size,
-			   "teep-acceptance-state.cbor") ||
-	    object_name_eq(params[0].memref.buffer, params[0].memref.size,
-			   "teep-acceptance-state.0.cbor") ||
-	    object_name_eq(params[0].memref.buffer, params[0].memref.size,
-			   "teep-acceptance-state.1.cbor") ||
-	    d047_object_name_reserved(params[0].memref.buffer,
-				       params[0].memref.size)) {
-		IMSG("twep-wr-ta generic secure storage acceptance-state write rejected");
-		return TEE_ERROR_ACCESS_DENIED;
-	}
-
-	object_id = TEE_Malloc(params[0].memref.size, 0);
-	if (!object_id)
-		return TEE_ERROR_OUT_OF_MEMORY;
-	TEE_MemMove(object_id, params[0].memref.buffer, params[0].memref.size);
-
-	data = TEE_Malloc(params[1].memref.size, 0);
-	if (!data) {
-		TEE_Free(object_id);
-		return TEE_ERROR_OUT_OF_MEMORY;
-	}
-	TEE_MemMove(data, params[1].memref.buffer, params[1].memref.size);
-
-	res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE,
-					 object_id,
-					 params[0].memref.size,
-					 flags, TEE_HANDLE_NULL, NULL, 0,
-					 &object);
-	if (res != TEE_SUCCESS) {
-		EMSG("twep-wr-ta secure storage create failed 0x%08x", res);
-		TEE_Free(object_id);
-		TEE_Free(data);
-		return res;
-	}
-
-	res = TEE_WriteObjectData(object, data, params[1].memref.size);
-	if (res != TEE_SUCCESS) {
-		EMSG("twep-wr-ta secure storage write failed 0x%08x", res);
-		TEE_CloseAndDeletePersistentObject1(object);
-		TEE_Free(object_id);
-		TEE_Free(data);
-		return res;
-	}
-
-	TEE_CloseObject(object);
-	TEE_Free(object_id);
-	TEE_Free(data);
-	IMSG("twep-wr-ta secure storage put");
-	return TEE_SUCCESS;
-}
-
-TEE_Result twep_ta_cmd_secure_storage_get(uint32_t param_types,
-					 TEE_Param params[4])
-{
-	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-						 TEE_PARAM_TYPE_MEMREF_OUTPUT,
-						 TEE_PARAM_TYPE_NONE,
-						 TEE_PARAM_TYPE_NONE);
-	TEE_ObjectHandle object = TEE_HANDLE_NULL;
-	TEE_ObjectInfo object_info = { };
-	void *object_id = NULL;
-	void *data = NULL;
-	uint32_t read_bytes = 0;
-	TEE_Result res;
-
-	if (param_types != expected)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (params[0].memref.size == 0)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (d047_object_name_reserved(params[0].memref.buffer,
-				       params[0].memref.size)) {
-		IMSG("twep-wr-ta generic secure storage catalog-state read rejected");
-		return TEE_ERROR_ACCESS_DENIED;
-	}
-
-	object_id = TEE_Malloc(params[0].memref.size, 0);
-	if (!object_id)
-		return TEE_ERROR_OUT_OF_MEMORY;
-	TEE_MemMove(object_id, params[0].memref.buffer, params[0].memref.size);
-
-	res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE,
-				       object_id,
-				       params[0].memref.size,
-				       TEE_DATA_FLAG_ACCESS_READ |
-				       TEE_DATA_FLAG_SHARE_READ,
-				       &object);
-	if (res != TEE_SUCCESS) {
-		EMSG("twep-wr-ta secure storage open failed 0x%08x", res);
-		TEE_Free(object_id);
-		return res;
-	}
-
-	res = TEE_GetObjectInfo1(object, &object_info);
-	if (res != TEE_SUCCESS)
-		goto out;
-
-	if (params[1].memref.size < object_info.dataSize) {
-		params[1].memref.size = object_info.dataSize;
-		res = TEE_ERROR_SHORT_BUFFER;
-		goto out;
-	}
-
-	data = TEE_Malloc(object_info.dataSize, 0);
-	if (!data) {
-		res = TEE_ERROR_OUT_OF_MEMORY;
-		goto out;
-	}
-
-	res = TEE_ReadObjectData(object, data, object_info.dataSize,
-				 &read_bytes);
-	if (res != TEE_SUCCESS)
-		goto out;
-	if (read_bytes != object_info.dataSize) {
-		res = TEE_ERROR_CORRUPT_OBJECT;
-		goto out;
-	}
-
-	TEE_MemMove(params[1].memref.buffer, data, read_bytes);
-	params[1].memref.size = read_bytes;
-	IMSG("twep-wr-ta secure storage get");
-
-out:
-	TEE_CloseObject(object);
-	TEE_Free(object_id);
-	if (data)
-		TEE_Free(data);
-	return res;
-}
 
 TEE_Result twep_ta_cmd_production_envelope(uint32_t param_types,
 					  TEE_Param params[4],
@@ -4107,7 +3787,7 @@ TEE_Result TA_CreateEntryPoint(void)
 void TA_DestroyEntryPoint(void)
 {
 #ifdef TWEP_TA_D043_TEST_HOOKS
-	g_d043_runtime_test_fault = TA_TWEP_WR_D043_FAULT_NONE;
+	twep_ta_d043_runtime_test_reset();
 	twep_acceptance_test_reset_fault();
 #endif
 #ifdef TWEP_TA_WAMR_LINK

@@ -4,6 +4,13 @@
 
 Follow KISS and DRY in test design. Do not duplicate fixture generation, golden data, diagnostic keys, or E2E startup procedures; refer to shared helpers or canonical data. Before adding copy-and-paste tests, consider table-driven tests that express the same boundary conditions or integration into an existing make target.
 
+`make smoke-optee-trustzone-abi-vectors` is the cross-language CBOR boundary
+smoke. Go and Rust read `testdata/abi/vectors.hex` directly; the OP-TEE asset
+preparation copies that same file into the guest, where the C client decodes
+all vectors and passes the literal execute/resume envelope bytes through TEEC
+to their TA commands. This is distinct from tests that independently construct
+equivalent envelopes.
+
 ## Test Layers
 
 | Layer | Target | Purpose |

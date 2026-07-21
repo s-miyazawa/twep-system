@@ -15,6 +15,10 @@ binary-file tooling while the tests still compare the decoded bytes exactly.
 | `trustzone-resume-envelope` | `request_id` plus opaque `host_io_result_cbor` |
 
 Go and Rust decode and canonically re-encode every vector. The public vectors
-also pass through the typed Go codec. TrustZone parser and QEMU smoke coverage
-use the same field contracts; the C/TA boundary intentionally treats embedded
-CBOR values as opaque byte strings.
+also pass through the typed Go codec. `make smoke-optee-trustzone-abi-vectors`
+copies this file unchanged into the QEMU guest; the C host decodes all six
+entries and sends the exact `trustzone-execute-envelope` and
+`trustzone-resume-envelope` bytes through TEEC to the TA parsers. The execute
+vector must parse successfully, while the resume vector must reach the parser
+and fail because no continuation is pending. Embedded CBOR remains opaque at
+the C/TA boundary.

@@ -125,7 +125,13 @@ flowchart TB
 
         subgraph tadir["ta/"]
             taheader["include/twep_wr_ta.h\nUUID and command IDs 0-11"]
-            tac["twep_wr_ta.c\nTA entrypoints, command handlers, WAMR paths"]
+            tac["twep_wr_ta.c\nTA lifecycle, production runtime, host-I/O"]
+            tarouter["ta_command_router.c\ncommand ID routing table"]
+            tabasic["ta_basic_commands.c\nbasic smoke commands"]
+            tastorage["ta_secure_storage.c\nmeasurement and generic storage adapter"]
+            taspike["ta_wamr_spike.c\nhistorical WAMR spike"]
+            tastate["acceptance_state.c\nD043/D047 protected transactions"]
+            tatest["ta_d043_test.c\nhook-only fault commands"]
             tamake["Makefile / sub.mk / Android.mk\nTA build glue"]
             tabin["*.ta, *.elf, *.map\nignored build outputs"]
         end
@@ -213,11 +219,12 @@ flowchart TB
         teecinvoke["TEEC_InvokeCommand()"]
     end
 
-    subgraph ta["Secure World functions: ta/twep_wr_ta.c"]
+    subgraph ta["Secure World private implementation units"]
         tacreate["TA_CreateEntryPoint()"]
         taopen["TA_OpenSessionEntryPoint()"]
         tainvoke["TA_InvokeCommandEntryPoint()"]
-        simplecmds["cmd_ping()\ncmd_get_platform_status()\ncmd_get_random()\ncmd_get_time()\ncmd_cbor_dry_run()\ncmd_measure_wasm()"]
+        simplecmds["ta_basic_commands.c\nping/status/random/time/CBOR dry-run"]
+        measure["ta_secure_storage.c\nmeasure Wasm"]
         storagecmds["cmd_secure_storage_put()\ncmd_secure_storage_get()"]
         prodcmd["cmd_production_envelope()"]
         spikecmd["cmd_wamr_spike_exec()"]
@@ -245,6 +252,7 @@ flowchart TB
 
   teecinvoke --> tainvoke
   tainvoke --> simplecmds
+  tainvoke --> measure
   tainvoke --> storagecmds
   tainvoke --> prodcmd
   tainvoke --> spikecmd

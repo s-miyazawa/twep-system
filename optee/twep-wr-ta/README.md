@@ -116,8 +116,8 @@ linked into the TA.
 ## TA WAMR build flag
 
 The production makefile flag is `TWEP_TA_WAMR_LINK`; it gates **all** TA-local
-WAMR code in `ta/twep_wr_ta.c`, including the retained historical spike
-command. The former `TWEP_TA_WAMR_SPIKE_LINK` input remains a deprecated exact
+WAMR code, including the retained historical spike command in
+`ta/ta_wamr_spike.c`. The former `TWEP_TA_WAMR_SPIKE_LINK` input remains a deprecated exact
 alias. Supplying both names with different values is an error.
 
 | `TWEP_TA_WAMR_LINK` | TA behavior |
@@ -278,6 +278,7 @@ run_trustzone_smokes.sh default
 run_trustzone_smokes.sh diagnose
 run_trustzone_smokes.sh provision
 run_trustzone_smokes.sh failures
+run_trustzone_smokes.sh abi-vectors
 run_trustzone_smokes.sh execute-abi-negative
 run_trustzone_smokes.sh execute-helloworld
 run_trustzone_smokes.sh execute-calcadd
