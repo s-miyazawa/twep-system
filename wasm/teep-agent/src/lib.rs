@@ -14,6 +14,7 @@ use core::ptr::{self, addr_of_mut};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use sha2::{Digest, Sha256};
 mod catalog;
+#[cfg(any(not(feature = "m9-1-acceptance-only-smoke"), test))]
 mod catalog_validator;
 mod cbor;
 mod cose;
@@ -29,7 +30,9 @@ mod teep;
 mod verified;
 mod wasm_signature;
 
-use suit::{twep_app_component_id, twep_catalog_component_id};
+use suit::twep_app_component_id;
+#[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+use suit::twep_catalog_component_id;
 
 struct BumpAllocator;
 
@@ -119,6 +122,9 @@ pub extern "C" fn twep_app_main(input_ptr: u32, input_len: u32, out_desc_ptr: u3
     if resolver_mode == b"attestam-verified" {
         let attestam_url = cbor::text_field(&input_value, ATTESTAM_URL_KEY).unwrap_or_default();
         if !attestam_url.is_empty() && verified::trustzone_live_poc_acceptance_supported() {
+            #[cfg(feature = "m9-1-acceptance-only-smoke")]
+            let live_requested_component_id = requested_component_id;
+            #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
             let live_requested_component_id = match twep_catalog_component_id(b"default") {
                 Some(value) => value,
                 None => return 4,
@@ -126,7 +132,7 @@ pub extern "C" fn twep_app_main(input_ptr: u32, input_len: u32, out_desc_ptr: u3
             return session::run_verified_poc_acceptance(
                 out_desc_ptr,
                 attestam_url,
-                &live_requested_component_id,
+                live_requested_component_id.as_ref(),
             );
         }
         return verified::run_verified_dry_run(out_desc_ptr, &requested_component_id);

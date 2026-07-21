@@ -51,7 +51,7 @@ flowchart LR
     end
 
     subgraph secure["Secure World / OP-TEE TA"]
-        ta["twep-wr TA\ntwep_wr_ta.c"]
+        ta["twep-wr TA\ntwep_wr_ta.c lifecycle + private modules"]
         storage["OP-TEE persistent objects\nREE FS secure storage"]
         wamrnote["TA-local WAMR runtime\nTWEP_TA_WAMR_LINK=1"]
         teep["TEEP_Agent WAMR\nCatalog / TC decisions"]
@@ -125,7 +125,8 @@ flowchart TB
 
         subgraph tadir["ta/"]
             taheader["include/twep_wr_ta.h\nUUID and command IDs 0-11"]
-            tac["twep_wr_ta.c\nTA lifecycle, production runtime, host-I/O"]
+            tac["twep_wr_ta.c\nTA lifecycle entry points"]
+            taproduction["ta_production_runtime.c\nproduction envelope, WAMR, host-I/O"]
             tarouter["ta_command_router.c\ncommand ID routing table"]
             tabasic["ta_basic_commands.c\nbasic smoke commands"]
             tastorage["ta_secure_storage.c\nmeasurement and generic storage adapter"]
@@ -135,6 +136,8 @@ flowchart TB
             tamake["Makefile / sub.mk / Android.mk\nTA build glue"]
             tabin["*.ta, *.elf, *.map\nignored build outputs"]
         end
+
+        tac --> taproduction
 
         subgraph wamrdir["wamr-ta/"]
             wamrcmake["CMakeLists.txt\nbuild TA-safe iwasm archive"]

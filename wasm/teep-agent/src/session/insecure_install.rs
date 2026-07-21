@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 use super::*;
+use crate::suit::success_response_payload;
 
 pub(super) fn process_update_payload(
     out_desc_ptr: u32,

@@ -23,6 +23,11 @@ enum twep_ta_production_envelope_kind {
 TWEP_TA_HIDDEN TEE_Result twep_ta_dispatch_command(uint32_t command,
 						    uint32_t param_types,
 						    TEE_Param params[4]);
+TWEP_TA_HIDDEN void twep_ta_runtime_destroy(void);
+TWEP_TA_HIDDEN TEE_Result twep_ta_session_open(void **);
+TWEP_TA_HIDDEN void twep_ta_session_close(void *);
+TWEP_TA_HIDDEN TEE_Result twep_ta_session_invoke(void *, uint32_t, uint32_t,
+						 TEE_Param[4]);
 TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_ping(uint32_t, TEE_Param[4]);
 TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_get_platform_status(uint32_t,
 							   TEE_Param[4]);
@@ -37,6 +42,8 @@ TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_cbor_dry_run(uint32_t, TEE_Param[4]);
 TWEP_TA_HIDDEN bool twep_ta_d047_object_name_reserved(const char *, uint32_t);
 TWEP_TA_HIDDEN TEE_Result twep_ta_sha256_bytes(const uint8_t *, size_t,
 						uint8_t[32]);
+TWEP_TA_HIDDEN TEE_Result twep_ta_write_persistent_object(
+	const char *, uint32_t, const uint8_t *, uint32_t);
 TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_wamr_spike_exec(uint32_t,
 							   TEE_Param[4]);
 TWEP_TA_HIDDEN TEE_Result twep_ta_cmd_production_envelope(
@@ -48,8 +55,6 @@ TWEP_TA_HIDDEN bool twep_ta_take_d043_runtime_test_fault(uint32_t);
 TWEP_TA_HIDDEN void twep_ta_d043_runtime_test_reset(void);
 TWEP_TA_HIDDEN void twep_ta_pending_diagnostics(uint32_t *, uint32_t *,
 						uint32_t *);
-TWEP_TA_HIDDEN TEE_Result twep_ta_write_persistent_object(
-	const char *, uint32_t, const uint8_t *, uint32_t);
 #endif
 #ifdef TWEP_TA_WAMR_LINK
 TWEP_TA_HIDDEN bool twep_ta_ensure_wamr_runtime(void);

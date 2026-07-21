@@ -535,9 +535,9 @@ run_host_io_resume_negative() {
 run_sha256_boundary_negative() {
 	log="/tmp/twep-trustzone-sha256-boundary-negative.log"
 	: >"${log}"
-	grep -q "request_body_sha256" "${PROJECT_DIR}/ta/twep_wr_ta.c"
-	grep -q "normalized_input_sha256" "${PROJECT_DIR}/ta/twep_wr_ta.c"
-	if grep -nE "payload_sha256|payload hash|app.hash|catalog.*sha|sha.*catalog|SUIT payload" "${PROJECT_DIR}/ta/twep_wr_ta.c" >>"${log}"; then
+	grep -q "request_body_sha256" "${PROJECT_DIR}/ta/ta_production_runtime.c"
+	grep -q "normalized_input_sha256" "${PROJECT_DIR}/ta/ta_production_runtime.c"
+	if grep -nE "payload_sha256|payload hash|app.hash|catalog.*sha|sha.*catalog|SUIT payload" "${PROJECT_DIR}/ta/ta_production_runtime.c" >>"${log}"; then
 		cat "${log}"
 		echo "TA C SHA-256 boundary violation: catalog/app trust hash found"
 		exit 1

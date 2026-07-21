@@ -6,6 +6,7 @@ set -eu
 
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "${PROJECT_DIR}/../.." && pwd)
+TEEP_AGENT_WASM=${TWEP_TEEP_AGENT_WASM:-${REPO_ROOT}/build/teep-agent.wasm}
 GUEST_DIR="${PROJECT_DIR}/guest"
 TRUSTZONE_BUILD_DIR="${REPO_ROOT}/build/twep-wr-trustzone"
 TEEC_EXPORT=${TEEC_EXPORT:-${HOME}/opt/optee/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr}
@@ -41,7 +42,7 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC="${HOST_CC}" \
 	-L"${TRUSTZONE_BUILD_DIR}" -ltwep_wr \
 	-L"${TEEC_LIB_DIR}" -lteec \
 	-Wl,-rpath,/usr/lib -Wl,--allow-shlib-undefined
-cp "${REPO_ROOT}/build/teep-agent.wasm" "${GUEST_DIR}/build/teep-agent.wasm"
+cp "${TEEP_AGENT_WASM}" "${GUEST_DIR}/build/teep-agent.wasm"
 cp "${REPO_ROOT}/build/helloworld.wasm" "${GUEST_DIR}/build/helloworld.wasm"
 cp "${REPO_ROOT}/build/calcadd.wasm" "${GUEST_DIR}/build/calcadd.wasm"
 cp "${REPO_ROOT}/build/negaposi.wasm" "${GUEST_DIR}/build/negaposi.wasm"

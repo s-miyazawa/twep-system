@@ -50,6 +50,7 @@ extern "C" {
         expected_generation: u64,
         new_generation_ptr: u32,
     ) -> i32;
+    #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
     fn twep_host_commit_catalog(
         digest_ptr: u32,
         digest_len: u32,
@@ -302,6 +303,7 @@ pub(crate) fn commit_acceptance(
     }
 }
 
+#[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
 pub(crate) fn commit_catalog(
     digest: &[u8; 32],
     component_id: &[u8],

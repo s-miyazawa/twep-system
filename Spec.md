@@ -126,7 +126,7 @@ $ twep-cli negaposi -i image.jpg -o output.jpg
 
 1. The User runs `twep-cli <command> [args...]`.
 2. twep-cli generates a CBOR request and sends it to twepd over UDS.
-3. twepd decodes the request, normalizes the command, app input CBOR, and timeout, and calls the C ABI equivalent of `twep_wr_execute`.
+3. twepd decodes the request and passes it to `internal/twepwr`, which owns final normalization of the command, app input CBOR, and timeout before calling the C ABI equivalent of `twep_wr_execute`.
 4. twep-wr.so uses the TEEP_Agent to consult the Catalog File.
 5. If the Wasm app file corresponding to the command name exists and passes hash verification, it is loaded into a general WAMR instance.
 6. The CBOR input is passed to the Trusted Wasm App's `twep_app_main`.

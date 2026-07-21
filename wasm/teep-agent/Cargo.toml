@@ -8,6 +8,11 @@ repository = "https://github.com/s-miyazawa/twep-system"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Rebuild the historical M9.1 acceptance-only boundary for its live smoke.
+# Production/default builds remain on the M9.2 Catalog-only coordinator.
+m9-1-acceptance-only-smoke = []
+
 [dependencies]
 ciborium = { version = "0.2", default-features = false }
 coset = { version = "0.4.2", default-features = false }

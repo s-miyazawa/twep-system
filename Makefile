@@ -46,9 +46,14 @@ build/helloworld.wasm: wasm/apps/helloworld/Cargo.toml wasm/apps/helloworld/src/
 	cp wasm/apps/helloworld/target/wasm32-unknown-unknown/release/twep_helloworld.wasm $@
 	$(GO) run ./cmd/twep-wasm-sign -role app -in $@ -out $@
 
-build/teep-agent.wasm: wasm/teep-agent/Cargo.toml wasm/teep-agent/src/lib.rs wasm/teep-agent/src/catalog_validator.rs wasm/teep-agent/src/cbor.rs wasm/teep-agent/src/cose.rs wasm/teep-agent/src/credential_management.rs wasm/teep-agent/src/evidence.rs wasm/teep-agent/src/freshness.rs wasm/teep-agent/src/host_io.rs wasm/teep-agent/src/probes.rs wasm/teep-agent/src/protected_credentials.rs wasm/teep-agent/src/session.rs wasm/teep-agent/src/session/exchange.rs wasm/teep-agent/src/session/insecure_install.rs wasm/teep-agent/src/session/observation.rs wasm/teep-agent/src/suit.rs wasm/teep-agent/src/teep.rs wasm/teep-agent/src/verified.rs wasm/teep-agent/src/verified/credentials.rs wasm/teep-agent/src/verified/diagnostics.rs wasm/teep-agent/src/verified/dry_run.rs wasm/teep-agent/src/verified/live_acceptance.rs wasm/teep-agent/src/verified/state.rs wasm/teep-agent/src/wasm_signature.rs $(WASM_SIGNER_DEPS)
+build/teep-agent.wasm: wasm/teep-agent/Cargo.toml wasm/teep-agent/src/lib.rs wasm/teep-agent/src/catalog_validator.rs wasm/teep-agent/src/cbor.rs wasm/teep-agent/src/cose.rs wasm/teep-agent/src/credential_management.rs wasm/teep-agent/src/evidence.rs wasm/teep-agent/src/freshness.rs wasm/teep-agent/src/host_io.rs wasm/teep-agent/src/probes.rs wasm/teep-agent/src/protected_credentials.rs wasm/teep-agent/src/session.rs wasm/teep-agent/src/session/exchange.rs wasm/teep-agent/src/session/insecure_install.rs wasm/teep-agent/src/session/live.rs wasm/teep-agent/src/session/observation.rs wasm/teep-agent/src/suit.rs wasm/teep-agent/src/teep.rs wasm/teep-agent/src/verified.rs wasm/teep-agent/src/verified/agent_identity.rs wasm/teep-agent/src/verified/credentials.rs wasm/teep-agent/src/verified/diagnostics.rs wasm/teep-agent/src/verified/dry_run.rs wasm/teep-agent/src/verified/evidence_status.rs wasm/teep-agent/src/verified/live_acceptance.rs wasm/teep-agent/src/verified/state.rs wasm/teep-agent/src/verified/tests.rs wasm/teep-agent/src/wasm_signature.rs $(WASM_SIGNER_DEPS)
 	$(CARGO) build --manifest-path wasm/teep-agent/Cargo.toml --release --target wasm32-unknown-unknown
 	cp wasm/teep-agent/target/wasm32-unknown-unknown/release/twep_teep_agent.wasm $@
+	$(GO) run ./cmd/twep-wasm-sign -role teep-agent -in $@ -out $@
+
+build/teep-agent-m9-1-smoke.wasm: wasm/teep-agent/Cargo.toml wasm/teep-agent/src/lib.rs wasm/teep-agent/src/catalog_validator.rs wasm/teep-agent/src/cbor.rs wasm/teep-agent/src/cose.rs wasm/teep-agent/src/credential_management.rs wasm/teep-agent/src/evidence.rs wasm/teep-agent/src/freshness.rs wasm/teep-agent/src/host_io.rs wasm/teep-agent/src/probes.rs wasm/teep-agent/src/protected_credentials.rs wasm/teep-agent/src/session.rs wasm/teep-agent/src/session/exchange.rs wasm/teep-agent/src/session/insecure_install.rs wasm/teep-agent/src/session/live.rs wasm/teep-agent/src/session/observation.rs wasm/teep-agent/src/suit.rs wasm/teep-agent/src/teep.rs wasm/teep-agent/src/verified.rs wasm/teep-agent/src/verified/agent_identity.rs wasm/teep-agent/src/verified/credentials.rs wasm/teep-agent/src/verified/diagnostics.rs wasm/teep-agent/src/verified/dry_run.rs wasm/teep-agent/src/verified/evidence_status.rs wasm/teep-agent/src/verified/live_acceptance.rs wasm/teep-agent/src/verified/state.rs wasm/teep-agent/src/verified/tests.rs wasm/teep-agent/src/wasm_signature.rs $(WASM_SIGNER_DEPS)
+	$(CARGO) build --manifest-path wasm/teep-agent/Cargo.toml --release --target wasm32-unknown-unknown --target-dir build/cargo-teep-agent-m9-1 --features m9-1-acceptance-only-smoke
+	cp build/cargo-teep-agent-m9-1/wasm32-unknown-unknown/release/twep_teep_agent.wasm $@
 	$(GO) run ./cmd/twep-wasm-sign -role teep-agent -in $@ -out $@
 
 build/calcadd.wasm: wasm/apps/calcadd/Cargo.toml wasm/apps/calcadd/src/lib.rs $(WASM_SIGNER_DEPS)
@@ -465,10 +470,11 @@ smoke-optee-trustzone-attestam-live:
 
 # OP-TEE PoC verified path: live TAM acceptance is persisted, installation stays blocked.
 smoke-optee-trustzone-attestam-verified-acceptance:
+	$(MAKE) build/teep-agent-m9-1-smoke.wasm
 	test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make smoke-optee-trustzone-attestam-verified-acceptance ATTESTAM_REGISTER_URL=http://localhost:8080/SUITManifestService/RegisterManifest VERAISON_PROVISION_URL=https://localhost:9443/endorsement-provisioning/v1/submit"; exit 2; }
 	$(MAKE) provision-veraison-generic-eat-fixture VERAISON_PROVISION_URL="$(VERAISON_PROVISION_URL)"
 	$(MAKE) register-attestam-helloworld-fixture ATTESTAM_REGISTER_URL="$(ATTESTAM_REGISTER_URL)"
-	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
+	TWEP_TEEP_AGENT_WASM="$(CURDIR)/build/teep-agent-m9-1-smoke.wasm" ./optee/twep-wr-ta/prepare-diagnose-smoke.sh
 	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \

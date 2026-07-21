@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 global-incdirs-y += include
 srcs-y += twep_wr_ta.c
+srcs-y += ta_production_runtime.c
 srcs-y += ta_command_router.c
 srcs-y += ta_basic_commands.c
 srcs-y += ta_secure_storage.c

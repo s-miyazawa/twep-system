@@ -434,6 +434,7 @@ pub(crate) fn twep_app_component_id(command: &[u8]) -> Option<Vec<u8>> {
     Some(out)
 }
 
+#[cfg(any(not(feature = "m9-1-acceptance-only-smoke"), test))]
 pub(crate) fn twep_catalog_component_id(name: &[u8]) -> Option<Vec<u8>> {
     if !valid_command(name) {
         return None;

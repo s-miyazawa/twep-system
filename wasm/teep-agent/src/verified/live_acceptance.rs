@@ -65,31 +65,78 @@ pub(crate) fn accept_live_attestam_update_cose(
     }
     match candidate.info.component_kind {
         ComponentKind::Catalog => {
-            let exact_component_id = twep_catalog_component_id(b"default")
-                .ok_or(b"verified PoC default Catalog component could not be encoded".as_slice())?;
-            if candidate.info.catalog_name != Some(b"default")
-                || candidate.info.component_id != exact_component_id.as_slice()
+            #[cfg(feature = "m9-1-acceptance-only-smoke")]
+            return Err(b"M9.1 acceptance-only smoke rejects Catalog candidates");
+            #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
             {
-                return Err(b"verified PoC Update is not the exact default Catalog component");
+                let exact_component_id = twep_catalog_component_id(b"default").ok_or(
+                    b"verified PoC default Catalog component could not be encoded".as_slice(),
+                )?;
+                if candidate.info.catalog_name != Some(b"default")
+                    || candidate.info.component_id != exact_component_id.as_slice()
+                {
+                    return Err(b"verified PoC Update is not the exact default Catalog component");
+                }
+                if !crate::catalog_validator::validate_authoritative_catalog(candidate.info.payload)
+                {
+                    return Err(b"verified PoC Catalog payload is not a valid canonical Catalog");
+                }
+                let success_payload =
+                    success_response_payload(&candidate.info, candidate.update_token)
+                        .ok_or(b"verified PoC Catalog Success could not be encoded".as_slice())?;
+                if !commit_attestam_catalog_evidence_result(
+                    &state,
+                    &candidate,
+                    evidence_query_response,
+                    Some(&kid),
+                ) {
+                    return Err(b"verified PoC Catalog failed protected commit/readback gates");
+                }
+                Ok(LiveUpdateAcceptance::CatalogCommitted { success_payload })
             }
-            if !crate::catalog_validator::validate_authoritative_catalog(candidate.info.payload) {
-                return Err(b"verified PoC Catalog payload is not a valid canonical Catalog");
-            }
-            let success_payload = success_response_payload(&candidate.info, candidate.update_token)
-                .ok_or(b"verified PoC Catalog Success could not be encoded".as_slice())?;
-            if !commit_attestam_catalog_evidence_result(
-                &state,
-                &candidate,
-                evidence_query_response,
-                Some(&kid),
-            ) {
-                return Err(b"verified PoC Catalog failed protected commit/readback gates");
-            }
-            Ok(LiveUpdateAcceptance::CatalogCommitted { success_payload })
         }
-        ComponentKind::App => Err(b"verified PoC M9.2 rejects app Update candidates"),
+        ComponentKind::App => {
+            #[cfg(feature = "m9-1-acceptance-only-smoke")]
+            {
+                if !commit_attestam_acceptance_evidence_result(
+                    &state,
+                    &candidate,
+                    evidence_query_response,
+                    Some(&kid),
+                ) {
+                    return Err(b"M9.1 app acceptance failed protected D043 commit/readback gates");
+                }
+                Ok(LiveUpdateAcceptance::AcceptanceCommitted)
+            }
+            #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+            {
+                Err(b"verified PoC M9.2 rejects app Update candidates")
+            }
+        }
         ComponentKind::Unsupported => Err(b"verified PoC Update component is unsupported"),
     }
+}
+
+#[cfg(feature = "m9-1-acceptance-only-smoke")]
+fn commit_attestam_acceptance_evidence_result(
+    state: &VerificationState,
+    candidate: &TeepUpdateCandidate<'_>,
+    evidence_query_response: &[u8],
+    observed_attestam_kid: Option<&[u8]>,
+) -> bool {
+    let (binding_status, agent_identity_status, platform_status) =
+        attestam_live_acceptance_context(observed_attestam_kid);
+    commit_attestam_acceptance_evidence_result_cbor_with(
+        state,
+        candidate,
+        evidence_query_response,
+        binding_status,
+        &agent_identity_status,
+        &platform_status,
+        host_io::acceptance_generation,
+        host_io::commit_acceptance,
+    )
+    .is_some()
 }
 
 pub(super) fn verified_attestam_update_payload(
@@ -182,6 +229,7 @@ pub(super) fn attestam_live_acceptance_context(
     (binding_status, agent_identity_status, platform_status)
 }
 
+#[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
 pub(super) fn commit_attestam_catalog_evidence_result(
     state: &VerificationState,
     candidate: &TeepUpdateCandidate<'_>,
@@ -289,6 +337,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg(any(not(feature = "m9-1-acceptance-only-smoke"), test))]
 pub(super) fn commit_attestam_catalog_with<F, G>(
     state: &VerificationState,
     candidate: &TeepUpdateCandidate<'_>,
