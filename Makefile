@@ -36,7 +36,7 @@ build/libtwep_wr.so: lib/twep-wr/CMakeLists.txt lib/twep-wr/src/app_runtime.c li
 
 build-optee-trustzone: build/libtwep_wr_trustzone.so
 
-build/libtwep_wr_trustzone.so: lib/twep-wr/CMakeLists.txt lib/twep-wr/src/app_runtime.c lib/twep-wr/src/catalog_resolver.c lib/twep-wr/src/response_cbor.c lib/twep-wr/src/runtime.c lib/twep-wr/src/runtime_internal.h lib/twep-wr/src/teep_agent_runtime.c lib/twep-wr/src/wasm_signature.c lib/twep-wr/src/platform/trustzone/platform_trustzone.c lib/twep-wr/include/twep_wr.h
+build/libtwep_wr_trustzone.so: lib/twep-wr/CMakeLists.txt lib/twep-wr/src/app_runtime.c lib/twep-wr/src/catalog_resolver.c lib/twep-wr/src/response_cbor.c lib/twep-wr/src/runtime.c lib/twep-wr/src/runtime_internal.h lib/twep-wr/src/teep_agent_runtime.c lib/twep-wr/src/wasm_signature.c lib/twep-wr/src/platform/trustzone/platform_trustzone.c lib/twep-wr/src/platform/trustzone/trustzone_envelope.c lib/twep-wr/src/platform/trustzone/trustzone_storage.c lib/twep-wr/src/platform/trustzone/trustzone_transport.c lib/twep-wr/src/platform/trustzone/trustzone_internal.h lib/twep-wr/include/twep_wr.h
 	$(CMAKE) -S lib/twep-wr -B $(OPTEE_TWEP_WR_BUILD_DIR) -DCMAKE_TOOLCHAIN_FILE=$(OPTEE_BUILDROOT_TOOLCHAIN) -DWAMR_ROOT_DIR=$(WAMR_DIR) -DTWEP_WR_PLATFORM_BACKEND=trustzone
 	$(CMAKE) --build $(OPTEE_TWEP_WR_BUILD_DIR)
 	cp $(OPTEE_TWEP_WR_BUILD_DIR)/libtwep_wr.so $@
@@ -46,7 +46,7 @@ build/helloworld.wasm: wasm/apps/helloworld/Cargo.toml wasm/apps/helloworld/src/
 	cp wasm/apps/helloworld/target/wasm32-unknown-unknown/release/twep_helloworld.wasm $@
 	$(GO) run ./cmd/twep-wasm-sign -role app -in $@ -out $@
 
-build/teep-agent.wasm: wasm/teep-agent/Cargo.toml wasm/teep-agent/src/lib.rs wasm/teep-agent/src/catalog_validator.rs wasm/teep-agent/src/cbor.rs wasm/teep-agent/src/cose.rs wasm/teep-agent/src/credential_management.rs wasm/teep-agent/src/evidence.rs wasm/teep-agent/src/freshness.rs wasm/teep-agent/src/host_io.rs wasm/teep-agent/src/protected_credentials.rs wasm/teep-agent/src/session.rs wasm/teep-agent/src/suit.rs wasm/teep-agent/src/teep.rs wasm/teep-agent/src/verified.rs wasm/teep-agent/src/wasm_signature.rs $(WASM_SIGNER_DEPS)
+build/teep-agent.wasm: wasm/teep-agent/Cargo.toml wasm/teep-agent/src/lib.rs wasm/teep-agent/src/catalog_validator.rs wasm/teep-agent/src/cbor.rs wasm/teep-agent/src/cose.rs wasm/teep-agent/src/credential_management.rs wasm/teep-agent/src/evidence.rs wasm/teep-agent/src/freshness.rs wasm/teep-agent/src/host_io.rs wasm/teep-agent/src/probes.rs wasm/teep-agent/src/protected_credentials.rs wasm/teep-agent/src/session.rs wasm/teep-agent/src/session/observation.rs wasm/teep-agent/src/suit.rs wasm/teep-agent/src/teep.rs wasm/teep-agent/src/verified.rs wasm/teep-agent/src/verified/diagnostics.rs wasm/teep-agent/src/verified/state.rs wasm/teep-agent/src/wasm_signature.rs $(WASM_SIGNER_DEPS)
 	$(CARGO) build --manifest-path wasm/teep-agent/Cargo.toml --release --target wasm32-unknown-unknown
 	cp wasm/teep-agent/target/wasm32-unknown-unknown/release/twep_teep_agent.wasm $@
 	$(GO) run ./cmd/twep-wasm-sign -role teep-agent -in $@ -out $@
@@ -263,7 +263,7 @@ smoke-optee-trustzone-execute-abi-negative:
 
 smoke-optee-trustzone-execute-helloworld:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-helloworld' \
@@ -273,7 +273,7 @@ smoke-optee-trustzone-execute-helloworld:
 
 smoke-optee-trustzone-execute-calcadd:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-calcadd' \
@@ -283,7 +283,7 @@ smoke-optee-trustzone-execute-calcadd:
 
 smoke-optee-trustzone-execute-negaposi:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-negaposi' \
@@ -293,7 +293,7 @@ smoke-optee-trustzone-execute-negaposi:
 
 smoke-optee-trustzone-execute-hostcall-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-hostcall-negative' \
@@ -304,7 +304,7 @@ smoke-optee-trustzone-execute-hostcall-negative:
 
 smoke-optee-trustzone-execute-cleanup-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-cleanup-negative' \
@@ -318,7 +318,7 @@ smoke-optee-trustzone-execute-cleanup-negative:
 
 smoke-optee-trustzone-execute-catalog-resource-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-catalog-resource-negative' \
@@ -329,7 +329,7 @@ smoke-optee-trustzone-execute-catalog-resource-negative:
 
 smoke-optee-trustzone-teep-agent-resolve:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-resolve' \
@@ -339,7 +339,7 @@ smoke-optee-trustzone-teep-agent-resolve:
 
 smoke-optee-trustzone-teep-agent-resolve-hash-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-resolve-hash-negative' \
@@ -349,7 +349,7 @@ smoke-optee-trustzone-teep-agent-resolve-hash-negative:
 
 smoke-optee-trustzone-teep-agent-resolve-catalog-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-resolve-catalog-negative' \
@@ -360,7 +360,7 @@ smoke-optee-trustzone-teep-agent-resolve-catalog-negative:
 
 smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-resolve-wrapped-error-negative' \
@@ -373,7 +373,7 @@ smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative:
 # OP-TEE production public C ABI path: twep_wr_execute marshals through libteec into the TA.
 smoke-optee-trustzone-public-abi-wrapped-error-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh public-abi-wrapped-error-negative' \
@@ -383,7 +383,7 @@ smoke-optee-trustzone-public-abi-wrapped-error-negative:
 
 smoke-optee-trustzone-public-abi-app-hash-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh public-abi-app-hash-negative' \
@@ -393,7 +393,7 @@ smoke-optee-trustzone-public-abi-app-hash-negative:
 
 smoke-optee-trustzone-public-abi-resource-limit-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh public-abi-resource-limit-negative' \
@@ -403,7 +403,7 @@ smoke-optee-trustzone-public-abi-resource-limit-negative:
 
 smoke-optee-trustzone-public-abi-execute-helloworld:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh public-abi-execute-helloworld' \
@@ -414,7 +414,7 @@ smoke-optee-trustzone-public-abi-execute-helloworld:
 
 smoke-optee-trustzone-public-abi-execute-calcadd:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh public-abi-execute-calcadd' \
@@ -425,7 +425,7 @@ smoke-optee-trustzone-public-abi-execute-calcadd:
 
 smoke-optee-trustzone-public-abi-execute-negaposi:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh public-abi-execute-negaposi' \
@@ -440,7 +440,7 @@ smoke-optee-trustzone-attestam-live:
 	$(MAKE) provision-veraison-generic-eat-fixture VERAISON_PROVISION_URL="$(VERAISON_PROVISION_URL)"
 	$(MAKE) register-attestam-helloworld-fixture ATTESTAM_REGISTER_URL="$(ATTESTAM_REGISTER_URL)"
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ATTESTAM_URL="$(ATTESTAM_URL)" ./run_trustzone_smokes.sh attestam-live' \
@@ -457,7 +457,7 @@ smoke-optee-trustzone-attestam-verified-acceptance:
 	$(MAKE) provision-veraison-generic-eat-fixture VERAISON_PROVISION_URL="$(VERAISON_PROVISION_URL)"
 	$(MAKE) register-attestam-helloworld-fixture ATTESTAM_REGISTER_URL="$(ATTESTAM_REGISTER_URL)"
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ATTESTAM_URL="$(ATTESTAM_URL)" ./run_trustzone_smokes.sh attestam-verified-acceptance' \
@@ -477,7 +477,7 @@ smoke-optee-trustzone-attestam-verified-catalog:
 		cleanup() { $(MAKE) -C optee/twep-wr-ta clean >/dev/null; }; \
 		trap cleanup EXIT HUP INT TERM; \
 		$(MAKE) -C optee/twep-wr-ta clean; \
-		$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1 TWEP_TA_D043_TEST_HOOKS=1; \
+		$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1 TWEP_TA_D043_TEST_HOOKS=1; \
 		$(OPTEE_POSTRUN) \
 			--project-path $(CURDIR)/optee/twep-wr-ta \
 			--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ATTESTAM_URL="$(ATTESTAM_URL)" ./run_trustzone_smokes.sh attestam-verified-catalog' \
@@ -560,7 +560,7 @@ smoke-optee-trustzone-teep-agent-hostcall-evidence:
 
 smoke-optee-trustzone-teep-agent-transcript-limits:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-transcript-limits' \
@@ -575,7 +575,7 @@ smoke-optee-trustzone-teep-agent-transcript-limits:
 
 smoke-optee-trustzone-teep-agent-hostcall-bridge:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-hostcall-bridge' \
@@ -588,7 +588,7 @@ smoke-optee-trustzone-teep-agent-hostcall-bridge:
 
 smoke-optee-trustzone-teep-agent-acceptance:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-acceptance' \
@@ -610,7 +610,7 @@ smoke-optee-trustzone-teep-agent-acceptance-faults:
 		cleanup() { $(MAKE) -C optee/twep-wr-ta clean >/dev/null; }; \
 		trap cleanup EXIT HUP INT TERM; \
 		$(MAKE) -C optee/twep-wr-ta clean; \
-		$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1 TWEP_TA_D043_TEST_HOOKS=1; \
+		$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1 TWEP_TA_D043_TEST_HOOKS=1; \
 		$(OPTEE_POSTRUN) \
 			--project-path $(CURDIR)/optee/twep-wr-ta \
 			--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-acceptance-faults' \
@@ -623,7 +623,7 @@ smoke-optee-trustzone-teep-agent-two-session-generation:
 		cleanup() { $(MAKE) -C optee/twep-wr-ta clean >/dev/null; }; \
 		trap cleanup EXIT HUP INT TERM; \
 		$(MAKE) -C optee/twep-wr-ta clean; \
-		$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1 TWEP_TA_D043_TEST_HOOKS=1; \
+		$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1 TWEP_TA_D043_TEST_HOOKS=1; \
 		$(OPTEE_POSTRUN) \
 			--project-path $(CURDIR)/optee/twep-wr-ta \
 			--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-two-session-generation' \
@@ -632,7 +632,7 @@ smoke-optee-trustzone-teep-agent-two-session-generation:
 
 smoke-optee-trustzone-teep-agent-hostcall-object-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh teep-agent-hostcall-object-negative' \
@@ -656,7 +656,7 @@ smoke-optee-trustzone-wamr-spike:
 
 smoke-optee-trustzone-wamr-spike-linked:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh wamr-spike-linked' \
@@ -666,7 +666,7 @@ smoke-optee-trustzone-wamr-spike-linked:
 
 smoke-optee-trustzone-wamr-spike-linked-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh wamr-spike-linked-negative' \
@@ -676,7 +676,7 @@ smoke-optee-trustzone-wamr-spike-linked-negative:
 
 smoke-optee-trustzone-wamr-spike-input-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh wamr-spike-input-negative' \
@@ -688,7 +688,7 @@ smoke-optee-trustzone-wamr-spike-input-negative:
 
 smoke-optee-trustzone-wamr-spike-output-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh wamr-spike-output-negative' \
@@ -699,7 +699,7 @@ smoke-optee-trustzone-wamr-spike-output-negative:
 
 smoke-optee-trustzone-wamr-spike-cleanup-negative:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh wamr-spike-cleanup-negative' \
@@ -713,7 +713,7 @@ smoke-optee-trustzone-wamr-spike-cleanup-negative:
 
 smoke-optee-trustzone-wamr-spike-negatives:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
-	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 	$(OPTEE_POSTRUN) \
 		--project-path $(CURDIR)/optee/twep-wr-ta \
 		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh wamr-spike-negatives' \

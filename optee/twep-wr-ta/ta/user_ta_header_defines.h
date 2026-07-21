@@ -14,7 +14,7 @@
  * session-owned pending transcripts.
  */
 #define TA_FLAGS (TA_FLAG_SINGLE_INSTANCE | TA_FLAG_MULTI_SESSION)
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 #define TA_STACK_SIZE (128 * 1024)
 #define TA_DATA_SIZE (8 * 1024 * 1024)
 #else

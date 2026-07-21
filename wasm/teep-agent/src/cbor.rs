@@ -202,3 +202,45 @@ fn write_type_len(out: &mut Vec<u8>, major: u8, value: usize) -> Option<()> {
     }
     Some(())
 }
+
+#[cfg(test)]
+mod abi_vector_tests {
+    use super::value;
+    use alloc::vec::Vec;
+    use ciborium::ser::into_writer;
+
+    #[test]
+    fn canonical_abi_vectors_round_trip_byte_for_byte() {
+        let source = include_str!("../../../testdata/abi/vectors.hex");
+        for line in source
+            .lines()
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        {
+            let (name, encoded) = line.split_once('|').expect("named ABI vector");
+            let bytes = decode_hex(encoded).expect("valid ABI vector hex");
+            let decoded = value(&bytes).expect("valid single CBOR value");
+            let mut reencoded = Vec::new();
+            into_writer(&decoded, &mut reencoded).expect("CBOR re-encode");
+            assert_eq!(reencoded, bytes, "non-canonical vector: {name}");
+        }
+    }
+
+    fn decode_hex(input: &str) -> Option<Vec<u8>> {
+        if !input.len().is_multiple_of(2) {
+            return None;
+        }
+        input
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| Some((nibble(pair[0])? << 4) | nibble(pair[1])?))
+            .collect()
+    }
+
+    fn nibble(value: u8) -> Option<u8> {
+        match value {
+            b'0'..=b'9' => Some(value - b'0'),
+            b'a'..=b'f' => Some(value - b'a' + 10),
+            _ => None,
+        }
+    }
+}

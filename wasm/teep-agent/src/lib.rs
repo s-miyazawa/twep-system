@@ -21,6 +21,7 @@ mod credential_management;
 mod evidence;
 mod freshness;
 mod host_io;
+mod probes;
 mod protected_credentials;
 mod session;
 mod suit;
@@ -90,6 +91,7 @@ pub extern "C" fn twep_app_free(_ptr: u32, _len: u32) {}
 const TARGET_COMMAND_KEY: &[u8] = b"target_command";
 const RESOLVER_MODE_KEY: &[u8] = b"resolver_mode";
 const ATTESTAM_URL_KEY: &[u8] = b"attestam_url";
+#[cfg(test)]
 const COMMAND_KEY: &[u8] = b"command";
 
 #[no_mangle]
@@ -102,110 +104,8 @@ pub extern "C" fn twep_app_main(input_ptr: u32, input_len: u32, out_desc_ptr: u3
         Some(value) => value,
         None => return 2,
     };
-    if let Some(command) = cbor::text_field(&input_value, COMMAND_KEY) {
-        if command == b"hostcall_http_probe" {
-            let attestam_url = cbor::text_field(&input_value, ATTESTAM_URL_KEY)
-                .unwrap_or(b"https://ta.example.invalid/tam");
-            let mut out = [0u8; 128];
-            let (status, _out_len) = host_io::http_post(attestam_url, b"", &mut out);
-            return if status == 0 {
-                write_output(out_desc_ptr, &ok_output())
-            } else {
-                127
-            };
-        }
-        if command == b"hostcall_evidence_probe" {
-            let challenge = [0x10u8, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
-            let agent_public_key_cose = [0xa1u8, 0x61, b'k', 0x63, b'd', b'e', b'v'];
-            let mut out = [0u8; 128];
-            return match host_io::create_evidence(&challenge, &agent_public_key_cose, &mut out) {
-                Ok(_) => write_output(out_desc_ptr, &ok_output()),
-                Err(_) => 127,
-            };
-        }
-        if command == b"hostcall_acceptance_probe_1"
-            || command == b"hostcall_acceptance_probe_2"
-            || command == b"hostcall_acceptance_probe_3"
-            || command == b"hostcall_acceptance_probe_stale"
-        {
-            let (body, sequence) = if command.ends_with(b"_1") {
-                (b"acceptance-probe-1".as_slice(), 1)
-            } else if command.ends_with(b"_2") {
-                (b"acceptance-probe-2".as_slice(), 2)
-            } else if command.ends_with(b"_3") {
-                (b"acceptance-probe-3".as_slice(), 3)
-            } else {
-                (b"acceptance-probe-stale".as_slice(), 3)
-            };
-            let mut out = [0u8; 128];
-            let (status, _) = host_io::http_post(b"https://ta.example.invalid/tam", body, &mut out);
-            if status != 0 {
-                return 127;
-            }
-            let generation = match host_io::acceptance_generation() {
-                Ok(value) => value,
-                Err(_) => return 127,
-            };
-            let expected_generation = if command.ends_with(b"_stale") {
-                generation.saturating_sub(1)
-            } else {
-                generation
-            };
-            return match host_io::commit_acceptance(
-                &sha256(body),
-                b"\x82\x4btwep-app-v1\x4bremotehello",
-                sequence,
-                expected_generation,
-            ) {
-                Ok(new_generation) if new_generation == generation + 1 => {
-                    write_output(out_desc_ptr, &ok_output())
-                }
-                _ => 127,
-            };
-        }
-        if command == b"hostcall_bad_read_probe" {
-            return match host_io::read_file_len(b"../catalog/catalog.cbor") {
-                Ok(None) | Err(_) => write_output(
-                    out_desc_ptr,
-                    &error_output(b"hostcall.bad_object_blocked", b"bad read object blocked"),
-                ),
-                Ok(Some(_)) => 127,
-            };
-        }
-        if command == b"hostcall_bad_write_probe" {
-            if !host_io::write_file(b"../tmp/teep-agent-probe", b"probe") {
-                return write_output(
-                    out_desc_ptr,
-                    &error_output(b"hostcall.bad_object_blocked", b"bad write object blocked"),
-                );
-            }
-            return 127;
-        }
-        if command == b"hostcall_verified_result_write_probe" {
-            if !host_io::write_file(crate::evidence::VERIFIED_EVIDENCE_RESULT_PATH, b"probe") {
-                return write_output(
-                    out_desc_ptr,
-                    &error_output(
-                        b"hostcall.bad_object_blocked",
-                        b"generic acceptance result write blocked",
-                    ),
-                );
-            }
-            return 127;
-        }
-        if command == b"hostcall_acceptance_result_stale_probe" {
-            return if verified::protected_evidence_result_is_stale() {
-                write_output(
-                    out_desc_ptr,
-                    &error_output(
-                        b"hostcall.acceptance_result_stale",
-                        b"stale acceptance result rejected",
-                    ),
-                )
-            } else {
-                127
-            };
-        }
+    if let Some(status) = probes::dispatch(&input_value, out_desc_ptr) {
+        return status;
     }
     let target_command = match cbor::text_field(&input_value, TARGET_COMMAND_KEY) {
         Some(value) if !value.is_empty() => value,

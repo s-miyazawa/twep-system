@@ -1,0 +1,17 @@
+# TWEP Implementation Status
+
+This page is the short index for current behavior. It is not a forward-looking
+implementation plan. Read the linked canonical documents for normative details
+and read `Spec.md` separately for the product target.
+
+| Item | State and meaning | Canonical documentation | Principal implementation | Principal verification |
+| --- | --- | --- | --- | --- |
+| D027 | Implemented: TrustZone host I/O uses an explicit, session-bound continuation; no WAMR call frame survives an REE round trip. | `docs/Architecture.md`, `docs/ABI.md` | `optee/twep-wr-ta/ta/`, `lib/twep-wr/src/platform/trustzone/` | host-I/O resume and negative TrustZone smokes in `docs/Testing.md` |
+| D043 | Implemented: one protected, generation-based acceptance transaction owns the consumed QueryResponse digest and component sequences. | `docs/ABI.md`, `docs/Security.md` | `optee/twep-wr-ta/ta/acceptance_state.c`, TEEP Agent acceptance hostcalls | D043 fault, restart, stale-generation, replay, and object-access smokes |
+| D045 | Implemented PoC boundary: fixed development credentials and REE-produced development Evidence can exercise verified protocol checks but can never establish `final-verified=true`. | `docs/Security.md`, `docs/AttesTAM.md` | `wasm/teep-agent/`, protected credential fixtures | verified acceptance smoke and credential/policy negative smokes |
+| D046 | Implemented: live token A and token B have separate roles; ordered continuation and the exact pending transcript provide session binding. | `docs/ABI.md`, `docs/Security.md` | TEEP Agent verified session processing and TA continuation state | live acceptance and host-I/O transcript negative smokes |
+| D047 | Implemented: only the exact default Catalog TC can be published through the TA-owned two-slot Catalog plus D043 transaction. | `docs/ABI.md`, `docs/Security.md` | TEEP Agent Catalog validation, TA protected Catalog state | Catalog commit/readback, fault, restart, hash, resource, and object-access smokes |
+| M8.5 | Complete: the production TrustZone path executes TEEP Agent and general applications in TA-local WAMR with public C ABI v3 transport. | `docs/Architecture.md`, `docs/Interface.md` | `lib/twep-wr/`, `optee/twep-wr-ta/` | baseline, failure, public-ABI-v3, and app execution smokes |
+| M9.1 | Complete: live verified acceptance can advance D043 once, then stops without Catalog/app installation or app execution. | `docs/Interface.md`, `docs/Security.md` | TEEP Agent live acceptance coordinator and TA acceptance state | `smoke-optee-trustzone-attestam-verified-acceptance` |
+| M9.2 | Complete for Catalog only: validates and protects the default metadata-only Catalog, sends Success after readback, rejects app Update, performs no app installation/execution, and retains `final-verified=false`. | `docs/ABI.md`, `docs/Security.md`, `Spec.md` | TEEP Agent Catalog coordinator and TA D047 storage | `smoke-optee-trustzone-attestam-verified-catalog` and Catalog negative/fault smokes |
+| M10 | Regression checkpoint available: representative production-path build and smoke coverage; it is not a claim that future verified app lifecycle or production credential infrastructure exists. | `docs/Testing.md` | repository build and smoke targets | M10 checkpoint plus slice-specific negative and regression targets |

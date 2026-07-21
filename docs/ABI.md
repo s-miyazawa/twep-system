@@ -28,6 +28,20 @@ The IDL is not finalized at this time. A future IDL must satisfy the following c
 - Allow the argument schema for each command to be referenced from the Catalog File.
 - Keep it distinct from the CBOR/COSE messages of the TEEP protocol itself.
 
+## Schema-to-implementation navigation
+
+| CBOR schema or envelope | Go | C public/backend | Rust/Wasm | OP-TEE TA |
+| --- | --- | --- | --- | --- |
+| Public request/response | `internal/cborcodec.Request`, `Response`, `EncodeRequest`, `DecodeRequest`, `EncodeResponse`, `DecodeResponse` | `twep_wr_execute`, `twep_wr_normalized_request_t` | general app `twep_app_main` input/output helpers | final-response transport in `TA_TWEP_WR_CMD_EXECUTE` |
+| Common app input/output | `internal/cborcodec.BuildAppInput`, `DecodeAppOutput` | WAMR invocation and output mapping in `lib/twep-wr` | `cbor`, app-specific crates, `write_output` | TA-local general-app WAMR invocation |
+| TEEP Agent resolve input/output | `internal/twepwr.NormalizeRequest` and resolver configuration | TEEP Agent invocation in the selected platform backend | `twep_app_main`, `session::run_resolve_app`, `verified` | TA-local TEEP Agent WAMR invocation |
+| TrustZone INIT/EXECUTE/RESUME envelopes | TrustZone broker callbacks through `internal/twepwr` | `twep_tz_make_execute_envelope` and host-I/O result encoding | opaque normalized input and continuation result consumption | `parse_production_envelope`, `TA_TWEP_WR_CMD_INIT`, `TA_TWEP_WR_CMD_EXECUTE`, `TA_TWEP_WR_CMD_RESUME_HOST_IO` |
+| D043 acceptance state | no authoritative Go writer | dedicated acceptance hostcalls only | `VerificationState`, live acceptance commit | `acceptance_state.c`, dedicated commit command |
+| D047 protected Catalog | no authoritative Go writer | `twep_host_commit_catalog` transport | Catalog validation and live Catalog commit | protected Catalog slots plus D043 activation |
+
+Canonical cross-language byte vectors and their expected fields live in
+`testdata/abi/`. They are compatibility fixtures, not a second schema source.
+
 ## Exported Functions
 
 Every Trusted Wasm App exports the following functions:

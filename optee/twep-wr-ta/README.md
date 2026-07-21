@@ -18,9 +18,9 @@ reading code, logs, or smoke results.
 
 | Path | Entry point | Purpose | Trust decision owner |
 | --- | --- | --- | --- |
-| Production public path | `twepd` -> `internal/twepwr` -> `libtwep_wr.so` -> `libteec` -> TA `EXECUTE`/`RESUME_HOST_IO` | The target TrustZone backend path for user commands. It preserves public C ABI v3 while moving TEEP_Agent, Catalog resolution, and app execution into the TA. Wasm execution requires the TA to be built with `TWEP_TA_WAMR_SPIKE_LINK=1`. | TA-local TEEP_Agent and TA-local production runtime |
+| Production public path | `twepd` -> `internal/twepwr` -> `libtwep_wr.so` -> `libteec` -> TA `EXECUTE`/`RESUME_HOST_IO` | The target TrustZone backend path for user commands. It preserves public C ABI v3 while moving TEEP_Agent, Catalog resolution, and app execution into the TA. Wasm execution requires the TA to be built with `TWEP_TA_WAMR_LINK=1`. | TA-local TEEP_Agent and TA-local production runtime |
 | Direct TA smoke path | `optee_example_twep_wr_ta` -> `libteec` -> TA private commands | Fast boundary validation for TEEC session handling, TA command ABI, secure storage, random/time, diagnostics, and focused negative cases. | The smoke checks transport and TA behavior; it is not the public `twepd` path |
-| WAMR spike path | `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` | Regression-only feasibility check for the original WAMR-in-TA spike command. Uses the same `TWEP_TA_WAMR_SPIKE_LINK=1` build as production TA WAMR, but remains a separate command entrypoint. | None for production trust; do not treat it as `twep_wr_execute` |
+| WAMR spike path | `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` | Regression-only feasibility check for the original WAMR-in-TA spike command. Uses the same `TWEP_TA_WAMR_LINK=1` build as production TA WAMR, but remains a separate command entrypoint. | None for production trust; do not treat it as `twep_wr_execute` |
 
 The normal user-facing TrustZone flow is the production public path:
 
@@ -61,7 +61,7 @@ The TA and REE host app currently validate these boundaries:
 - Regression smoke for the original WAMR-in-TA spike command.
 - Production TA execution for TEEP_Agent, Catalog resolution, and ordinary app
   runtime through `TA_TWEP_WR_CMD_INIT` / `EXECUTE` / `RESUME_HOST_IO`.
-  These paths require `TWEP_TA_WAMR_SPIKE_LINK=1` at TA build time; the
+  These paths require `TWEP_TA_WAMR_LINK=1` at TA build time; the
   repository `Makefile` sets that flag for the relevant smoke targets.
 
 The TrustZone backend is labeled `tee-ree-fs-secure-storage` for the permanent
@@ -115,11 +115,12 @@ linked into the TA.
 
 ## TA WAMR build flag
 
-The makefile flag `TWEP_TA_WAMR_SPIKE_LINK` is historical spike naming, but it
-currently gates **all** TA-local WAMR code in `ta/twep_wr_ta.c`, not only the
-spike command:
+The production makefile flag is `TWEP_TA_WAMR_LINK`; it gates **all** TA-local
+WAMR code in `ta/twep_wr_ta.c`, including the retained historical spike
+command. The former `TWEP_TA_WAMR_SPIKE_LINK` input remains a deprecated exact
+alias. Supplying both names with different values is an error.
 
-| `TWEP_TA_WAMR_SPIKE_LINK` | TA behavior |
+| `TWEP_TA_WAMR_LINK` | TA behavior |
 | --- | --- |
 | `0` (default for `make -C optee/twep-wr-ta`) | Boundary smokes, secure storage, envelope parsing, synthetic host-I/O smoke commands, and `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` rejection. `EXECUTE` with Wasm bytes returns `TEE_ERROR_NOT_SUPPORTED`. |
 | `1` | Builds `wamr-ta/` into `build/wamr-ta/libiwasm.a`, links it into the TA, and enables production TEEP_Agent/app execution plus the spike command. |
@@ -131,12 +132,12 @@ Typical local builds:
 make -C optee/twep-wr-ta
 
 # Production/runtime smokes and spike-linked regressions
-make -C optee/twep-wr-ta TWEP_TA_WAMR_SPIKE_LINK=1
+make -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 ```
 
 Repository entry points such as `make smoke-optee-trustzone-execute-helloworld`
 run `prepare-diagnose-smoke.sh` and then build the TA with
-`TWEP_TA_WAMR_SPIKE_LINK=1` automatically.
+`TWEP_TA_WAMR_LINK=1` automatically.
 
 When WAMR is linked, `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` loads supplied
 `helloworld.wasm` bytes, calls `twep_app_main`, and returns raw app CBOR
@@ -186,7 +187,7 @@ REE broker resume mismatches; they are not Catalog, Trusted Component, or app
 promotion decisions.
 
 The production TA runtime owns the following when
-`TWEP_TA_WAMR_SPIKE_LINK=1`:
+`TWEP_TA_WAMR_LINK=1`:
 
 - TEEP_Agent execution inside TA-local WAMR.
 - Catalog lookup, TC/app classification, payload hash verification, and app
@@ -264,7 +265,7 @@ path.
 - `provision_and_diagnose_trustzone.sh`: provisioning plus diagnostics smoke.
 - `protected_storage_failure_smoke.sh`: protected storage failure smoke.
 - `wamr-ta/`: OP-TEE TA WAMR platform shim built and linked when
-  `TWEP_TA_WAMR_SPIKE_LINK=1`. It backs both the production TA runtime and the
+  `TWEP_TA_WAMR_LINK=1`. It backs both the production TA runtime and the
   regression spike command; only the `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` entrypoint
   is spike-specific.
 
@@ -330,3 +331,12 @@ test command.
 `default`, `diagnose`, and `provision`. Run the other modes individually, or
 use the repository `Makefile` targets such as `make smoke-optee-trustzone` and
 `make check-optee-trustzone-smokes` for broader coverage.
+
+The fixed command-to-artifact mapping used by the public TrustZone smoke path
+is **PoC candidate artifact preloading**, not an authorization database. The
+REE recognizes the demo commands so it can transport candidate Wasm bytes to
+the TA. Those bytes remain untrusted input: the TA-local TEEP Agent validates
+Catalog metadata and hashes, and the TA-local general-app runtime makes the
+execution authorization decision. An REE mapping, cache hit, filename, or
+successful transport cannot authorize Catalog publication, app promotion, or
+execution by itself.

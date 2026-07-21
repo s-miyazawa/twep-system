@@ -43,6 +43,27 @@ The TrustZone backend runs TEEP_Agent, Catalog resolution, and general Trusted W
 | User input/output file | Prevention of path traversal and unintended reads or writes |
 | twepd socket | Prevention of unauthorized execution by other users |
 
+## Threat and Authority Matrix
+
+| Asset or decision | Attacker capability considered | Trusted authority | Guaranteed now | Not guaranteed | Linux / TrustZone | Time horizon |
+| --- | --- | --- | --- | --- | --- | --- |
+| Evidence production | REE can replace or replay transported bytes | Current PoC TEEP Agent plus fixed development Evidence key | Protocol shape, nonce/key correspondence, and Veraison interoperability can be exercised | Hardware-rooted Evidence or production key custody | Linux and the current TrustZone PoC use REE-produced development Evidence; neither can claim final verification from it | Current PoC; hardware Evidence is future work |
+| Veraison appraisal | Network and REE can delay, drop, or alter responses | Veraison, consumed by AttesTAM as Relying Party | AttesTAM requires an affirming appraisal before its acceptance step | TEEP Agent does not receive or independently validate a Veraison Attestation Result | Same authority model on both backends | Current |
+| AttesTAM acceptance | REE can replay or mix sessions and responses | TAM signature plus TA-session transcript, D046 token handling, and D043 protected generation | A current TAM-signed Update is bound to the live Evidence exchange and consumed once | Availability, production credential lifecycle, or `final-verified=true` | Linux observes; TrustZone can commit the protected acceptance state | Current PoC |
+| Catalog authorization | REE can supply arbitrary Catalog or app bytes | TEEP Agent semantic validation plus the TA-owned D047/D043 publication transaction | Only the exact default Catalog TC can become the active protected Catalog | App TCs, debug JSON, management data, and personalization cannot authorize Catalog changes | Linux is observation-only; TrustZone is authoritative | Current M9.2 |
+| App installation and execution authorization | REE can substitute candidate bytes or names | Future verified app-TC checks plus protected Catalog lookup | Existing local/mock apps still receive hash/signature checks; M9.2 rejects verified app Update and performs no app execution | Verified app installation, protected authorization, and execution are not implemented | Linux development paths exist; TrustZone M9.2 is Catalog-only | Future verified lifecycle |
+| Protected state | REE controls storage availability and can roll back REE FS | TA object access rules, two-slot validation, and current D043 linkage | Corruption, ambiguous slots, stale generations, and unauthorized object access fail closed | Rollback resistance and availability are outside this PoC threat model | Linux files are observations; TrustZone REE FS Secure Storage is authoritative | Current PoC |
+| General app sandbox | App may be malicious and import host functions | TA or Linux `twep-wr` runtime policy and Catalog entry | General apps currently receive no hostcalls and must match authorized bytes | Host confidentiality from the Linux process owner and denial-of-service resistance are not claimed | Linux has no TEE isolation; TrustZone isolates execution inside the TA | Current |
+
+These are four separate decisions, in order: Evidence is generated; Veraison
+appraises it; AttesTAM accepts the TEEP Agent in a live protocol session; and
+the TEEP Agent plus TA-local protected state authorize a Catalog or, in a
+future lifecycle, an app. Success at one stage does not grant the authority of
+the next. In particular, the TrustZone REE provides availability, HTTP/TLS and
+byte transport, cache access, and development Evidence brokering. It does not
+decide appraisal, AttesTAM acceptance, Catalog publication, app promotion, or
+app execution authorization.
+
 ## Threats
 
 | threat | mitigation |

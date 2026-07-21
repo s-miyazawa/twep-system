@@ -10,7 +10,7 @@ Generated build outputs under `guest/`, `build/`, `host/*.o`, and `ta/*.ta`
 are intentionally summarized instead of expanded.
 
 TA-local TEEP_Agent and app Wasm execution require building the TA with
-`TWEP_TA_WAMR_SPIKE_LINK=1`. The default `make -C optee/twep-wr-ta` build
+`TWEP_TA_WAMR_LINK=1`. The default `make -C optee/twep-wr-ta` build
 leaves those paths unlinked. See `README.md` for the full build-flag table.
 
 For a rendered SVG focused on the production `twepd -> cgo -> libtwep_wr.so
@@ -22,7 +22,7 @@ For a rendered SVG focused on the production `twepd -> cgo -> libtwep_wr.so
 | --- | --- |
 | Production public path | The user-facing TrustZone backend path: `twepd` calls `libtwep_wr.so` through `internal/twepwr`, and `libtwep_wr.so` invokes the TA through `libteec`. |
 | Direct TA smoke path | The `optee_example_twep_wr_ta` smoke client calls TA private commands directly through `libteec` to validate boundary behavior quickly. |
-| WAMR spike path | The regression-only `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` command entrypoint. It shares the `TWEP_TA_WAMR_SPIKE_LINK=1` TA build with production TA WAMR, but is separate from production `twep_wr_execute`. |
+| WAMR spike path | The regression-only `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` command entrypoint. It shares the `TWEP_TA_WAMR_LINK=1` TA build with production TA WAMR, but is separate from production `twep_wr_execute`. |
 
 ## Overview Diagram
 
@@ -53,7 +53,7 @@ flowchart LR
     subgraph secure["Secure World / OP-TEE TA"]
         ta["twep-wr TA\ntwep_wr_ta.c"]
         storage["OP-TEE persistent objects\nREE FS secure storage"]
-        wamrnote["TA-local WAMR runtime\nTWEP_TA_WAMR_SPIKE_LINK=1"]
+        wamrnote["TA-local WAMR runtime\nTWEP_TA_WAMR_LINK=1"]
         teep["TEEP_Agent WAMR\nCatalog / TC decisions"]
         appwasm["app WAMR\nhelloworld, calcadd, negaposi"]
         spike["WAMR spike command\nregression only"]
@@ -163,7 +163,7 @@ flowchart TB
     tamake --> tac
     tamake --> taheader
     wamrcmake --> wamrplatform
-    topmake -.->|"TWEP_TA_WAMR_SPIKE_LINK=1\nproduction + spike WAMR"| wamrbuild
+    topmake -.->|"TWEP_TA_WAMR_LINK=1\nproduction + spike WAMR"| wamrbuild
     wamrbuild -.->|"linked into TA build"| tamake
 
     prepare --> guestbin
@@ -190,9 +190,9 @@ flowchart TB
 This diagram focuses on `host/main.c`, the direct TA smoke client. It does not
 represent the normal `twepd` public path; use the rendered SVG and the overview
 diagram above for that production connection path. Functions inside the
-`#ifdef TWEP_TA_WAMR_SPIKE_LINK` block (production TEEP/app WAMR,
+`#ifdef TWEP_TA_WAMR_LINK` block (production TEEP/app WAMR,
 `cmd_wamr_spike_exec`, and most TEEP natives) are omitted when the TA is built
-with the default `TWEP_TA_WAMR_SPIKE_LINK=0`.
+with the default `TWEP_TA_WAMR_LINK=0`.
 
 ```mermaid
 flowchart TB

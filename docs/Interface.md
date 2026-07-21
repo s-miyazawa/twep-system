@@ -203,7 +203,10 @@ const char *twep_wr_status_string(twep_wr_status_t status);
 ### ABI version
 
 - The public C ABI version is `3`. Version 3 changed the input to `twep_wr_execute` from top-level request CBOR to `twep_wr_normalized_request_t`.
-- In version 3, the routing command and Wasm app input have already been normalized by the Go/twepd side, and the C side does not scan top-level request CBOR.
+- In version 3, `internal/twepwr` owns final request normalization. The CLI and
+  daemon decode and transport user input, `internal/twepwr.Context.Execute`
+  produces the routing command, app-input CBOR, and effective timeout, and the
+  C side does not scan top-level request CBOR.
 - Increment the version for breaking ABI changes.
 
 ### Timeout policy
@@ -647,12 +650,30 @@ int32_t twep_host_commit_acceptance(
     uint64_t expected_generation,
     uint32_t new_generation_ptr);
 
+int32_t twep_host_commit_catalog(
+    uint32_t query_response_sha256_ptr,
+    uint32_t query_response_sha256_len,
+    uint32_t component_id_ptr,
+    uint32_t component_id_len,
+    uint64_t sequence,
+    uint64_t expected_generation,
+    uint32_t catalog_ptr,
+    uint32_t catalog_len,
+    uint32_t catalog_sha256_ptr,
+    uint32_t catalog_sha256_len,
+    uint32_t new_generation_ptr);
+
 int32_t twep_host_random(
     uint32_t buf_ptr,
     uint32_t buf_len);
 
 uint64_t twep_host_unix_time_ms(void);
 ```
+
+`twep_host_commit_catalog` is the only D047 protected Catalog publication
+boundary. It is TEEP-Agent-only and TrustZone-only; generic file writes, the
+REE broker, public Secure Storage commands, and general applications cannot
+publish or select a protected Catalog slot.
 
 Return values:
 
@@ -748,7 +769,7 @@ For now, the CDDL-like schema in `docs/ABI.md` is authoritative. When an Interfa
 
 1. twep-cli sends `-i image.jpg -o output.jpg` as argv.
 2. twep-cli validates the input path and reads the JPEG file bytes.
-3. During request normalization in twep-cli/twepd, the input JPEG bytes are placed in `files["input"]` of app-input and `metadata.input_mime="image/jpeg"` is added.
+3. During request normalization owned by `internal/twepwr`, the input JPEG bytes are placed in `files["input"]` of app-input and `metadata.input_mime="image/jpeg"` is added. The CLI and twepd supply the decoded request and file bytes but do not own the final normalized C-ABI request.
 4. The app places the color-inverted JPEG bytes in `files["output"]` of app-output and returns `metadata.output_mime="image/jpeg"`.
 5. twep-cli validates the output path and saves the file to the user-specified path using a temporary file followed by rename.
 6. twep-cli emits a message indicating that the save completed.

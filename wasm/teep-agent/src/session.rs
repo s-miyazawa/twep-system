@@ -11,14 +11,12 @@ use crate::evidence;
 use crate::freshness::{dev_sequence_freshness_update, dev_sequence_is_fresh_bytes};
 use crate::host_io;
 use crate::suit::{
-    installed_payload_path, manifest_count_text, payload_uri_text, sequence_number_text,
-    success_response_payload, suit_manifest_info, teep_update_candidate, update_metadata,
+    installed_payload_path, success_response_payload, teep_update_candidate, update_metadata,
     ComponentKind, SuitManifestInfo, TeepUpdateCandidate, TeepUpdateCandidateError,
 };
 use crate::teep::{
     query_response_payload, query_response_payload_with_attestation, teep_message_token,
-    teep_message_type, update_manifest_list, QueryResponsePayloadError, TEEP_TYPE_QUERY_REQUEST,
-    TEEP_TYPE_UPDATE,
+    teep_message_type, QueryResponsePayloadError, TEEP_TYPE_QUERY_REQUEST, TEEP_TYPE_UPDATE,
 };
 use crate::verified::{self, VerificationState};
 use crate::wasm_signature;
@@ -42,19 +40,6 @@ const LAST_TEEP_ATTESTATION_RESPONSE_BODY_PATH: &[u8] =
     b"teep-agent/last-attestation-query-response-body.cose";
 const VERIFIED_EVIDENCE_QUERY_RESPONSE_PATH: &[u8] =
     b"teep-agent/verified-evidence-query-response.cose";
-const LAST_TEEP_UPDATE_MANIFEST0_PATH: &[u8] = b"teep-agent/update-manifest-0.cbor";
-const LAST_TEEP_UPDATE_MANIFEST_COUNT_PATH: &[u8] = b"teep-agent/update-manifest-count.txt";
-const LAST_TEEP_UPDATE_MANIFEST_COMPONENT_ID_PATH: &[u8] =
-    b"teep-agent/update-manifest-component-id.cbor";
-const LAST_TEEP_UPDATE_MANIFEST_SEQUENCE_PATH: &[u8] =
-    b"teep-agent/update-manifest-sequence-number.txt";
-const LAST_TEEP_UPDATE_MANIFEST_PAYLOAD_DIGEST_PATH: &[u8] =
-    b"teep-agent/update-manifest-payload-digest.cbor";
-const LAST_TEEP_UPDATE_MANIFEST_PAYLOAD_DIGEST_SHA256_PATH: &[u8] =
-    b"teep-agent/update-manifest-payload-digest-sha256.bin";
-const LAST_TEEP_UPDATE_PAYLOAD0_PATH: &[u8] = b"teep-agent/update-payload-0.bin";
-const LAST_TEEP_UPDATE_PAYLOAD_URI_PATH: &[u8] = b"teep-agent/update-payload-uri.txt";
-const LAST_TEEP_UPDATE_PAYLOAD_SHA256_PATH: &[u8] = b"teep-agent/update-payload-sha256.bin";
 const LAST_TEEP_UPDATE_PAYLOAD_HASH_STATUS_PATH: &[u8] =
     b"teep-agent/update-payload-hash-status.txt";
 const STAGING_UPDATE_PAYLOAD0_PATH: &[u8] = b"tmp/update-payload-0.bin";
@@ -79,6 +64,10 @@ const DEMO_AGENT_PUBLIC_COSE_KEY: &[u8] = &[
     0x42, 0xc3, 0xbe, 0x1b, 0x24, 0x4c, 0xc0, 0x3b, 0xca, 0x97, 0xf0, 0xce, 0x75, 0xe2, 0xd9, 0x3a,
     0xda, 0x1c, 0xe5, 0x56, 0x62, 0x92, 0x27, 0xf1, 0x0a, 0x8c, 0x2c, 0x5b, 0x29,
 ];
+
+mod observation;
+
+pub(crate) use observation::write_update_candidate as write_update_candidate_observation;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BuildQueryResponseError {
@@ -687,7 +676,7 @@ fn process_update_payload(
     requested_component_id: &[u8],
     body_payload: &[u8],
 ) -> Result<bool, i32> {
-    observe_update_manifest_summary(body_payload)?;
+    observation::observe_manifest_summary(body_payload)?;
     let candidate = match teep_update_candidate(body_payload, requested_component_id) {
         Ok(value) => value,
         Err(TeepUpdateCandidateError::PayloadHashMismatch) => {
@@ -710,7 +699,7 @@ fn process_update_payload(
             ));
         }
     };
-    write_update_candidate_observation_or_127(&candidate)?;
+    observation::write_update_candidate_checked(&candidate)?;
     verify_app_payload_signature_or_error(out_desc_ptr, &candidate)?;
     stage_update_or_127(&candidate)?;
     post_success(out_desc_ptr, attestam_url, &candidate)
@@ -733,83 +722,6 @@ fn verify_app_payload_signature_or_error(
             ),
         )),
     }
-}
-
-fn observe_update_manifest_summary(body_payload: &[u8]) -> Result<(), i32> {
-    let Some((manifest, manifest_count)) = update_manifest_list(body_payload) else {
-        return Ok(());
-    };
-    if !host_io::write_file(LAST_TEEP_UPDATE_MANIFEST0_PATH, manifest) {
-        return Err(127);
-    }
-    let Some(manifest_count_text) = manifest_count_text(manifest_count) else {
-        return Err(4);
-    };
-    if !host_io::write_file(LAST_TEEP_UPDATE_MANIFEST_COUNT_PATH, &manifest_count_text) {
-        return Err(127);
-    }
-    if let Some(info) = suit_manifest_info(manifest) {
-        if !host_io::write_file(
-            LAST_TEEP_UPDATE_MANIFEST_COMPONENT_ID_PATH,
-            info.component_id,
-        ) {
-            return Err(127);
-        }
-    }
-    Ok(())
-}
-
-pub(crate) fn write_update_candidate_observation(candidate: &TeepUpdateCandidate<'_>) -> bool {
-    write_update_candidate_observation_or_127(candidate).is_ok()
-}
-
-fn write_update_candidate_observation_or_127(
-    candidate: &TeepUpdateCandidate<'_>,
-) -> Result<(), i32> {
-    let manifest_info = candidate.info;
-    if !host_io::write_file(LAST_TEEP_UPDATE_MANIFEST0_PATH, candidate.manifest) {
-        return Err(127);
-    }
-    let Some(manifest_count_text) = manifest_count_text(candidate.manifest_count) else {
-        return Err(4);
-    };
-    if !host_io::write_file(LAST_TEEP_UPDATE_MANIFEST_COUNT_PATH, &manifest_count_text)
-        || !host_io::write_file(
-            LAST_TEEP_UPDATE_MANIFEST_COMPONENT_ID_PATH,
-            manifest_info.component_id,
-        )
-    {
-        return Err(127);
-    }
-    let Some(sequence_text) = sequence_number_text(manifest_info.sequence_number) else {
-        return Err(4);
-    };
-    let Some(payload_uri_text) = payload_uri_text(manifest_info.payload_uri) else {
-        return Err(4);
-    };
-    if !host_io::write_file(LAST_TEEP_UPDATE_MANIFEST_SEQUENCE_PATH, &sequence_text)
-        || !host_io::write_file(
-            LAST_TEEP_UPDATE_MANIFEST_PAYLOAD_DIGEST_PATH,
-            manifest_info.payload_digest,
-        )
-        || !host_io::write_file(
-            LAST_TEEP_UPDATE_MANIFEST_PAYLOAD_DIGEST_SHA256_PATH,
-            manifest_info.payload_digest_sha256,
-        )
-        || !host_io::write_file(LAST_TEEP_UPDATE_PAYLOAD0_PATH, manifest_info.payload)
-        || !host_io::write_file(
-            LAST_TEEP_UPDATE_PAYLOAD_SHA256_PATH,
-            &candidate.payload_sha256,
-        )
-        || !host_io::write_file(LAST_TEEP_UPDATE_PAYLOAD_URI_PATH, &payload_uri_text)
-        || !host_io::write_file(
-            LAST_TEEP_UPDATE_PAYLOAD_HASH_STATUS_PATH,
-            b"payload-hash=ok\n",
-        )
-    {
-        return Err(127);
-    }
-    Ok(())
 }
 
 fn stage_update_or_127(candidate: &TeepUpdateCandidate<'_>) -> Result<(), i32> {

@@ -76,7 +76,8 @@ TEEP_Agent host I/O
 - Payload: CBOR byte sequences
 - Memory management: the app allocates, the host copies, and the app frees.
 - Separate hostcalls for TEEP_Agent from those for general apps.
-- In principle, general apps receive no hostcalls other than logging.
+- General apps currently receive no hostcalls. Logging is only a future
+  allowlist candidate and is not registered for a general-app runtime.
 
 ### Boundary Between TEEP_Agent and AttesTAM
 

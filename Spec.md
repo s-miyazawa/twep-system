@@ -137,16 +137,32 @@ $ twep-cli negaposi -i image.jpg -o output.jpg
 
 ### When the Trusted Wasm App Does Not Exist Locally
 
-1. The User runs `twep-cli <command> [args...]`.
-2. twep-cli sends a CBOR request to twepd.
-3. twepd sends an execution request to twep-wr.so.
-4. twep-wr.so runs the TEEP_Agent and resolves the command name in the Catalog File.
-5. If the corresponding Wasm app is not installed, the selected resolver either acquires it from local testdata or initiates the TEEP QueryRequest/QueryResponse/Update/Success/Error flow with AttesTAM.
-6. The required Catalog File or Trusted Wasm App is acquired from the mock resolver or AttesTAM.
-7. The acquired artifact's hash and metadata are verified. In the TEEP flow, the artifact is also classified by its SUIT Component Identifier.
-8. The mock resolver installs development Catalog and app artifacts in their respective state directories. In the verified TEEP flow, only a verified `twep-catalog-v1` Catalog TC may replace the Catalog File; a verified `twep-app-v1` app TC is installed in the `apps/` cache without modifying the Catalog File.
-9. The Wasm app is loaded into WAMR and executed.
-10. The result is returned to twep-cli.
+The behavior depends on the resolver and milestone. The following two flows
+must not be read as one currently implemented flow.
+
+#### Current M9.2 verified behavior
+
+1. The User request reaches the TA-local TEEP Agent through the public C ABI and TrustZone execute envelope.
+2. The TEEP Agent performs the live TEEP/COSE/SUIT, freshness, credential/policy, identity, and AttesTAM-acceptance checks.
+3. It accepts only the default `twep-catalog-v1` Catalog TC, validates its bounded canonical metadata, and publishes it through the protected D047/D043 transaction.
+4. It rejects an app Update. It does not install a `twep-app-v1` TC, does not execute a general app, and ends with `teep.verified_required` when an app is absent.
+5. This fixed-development-credential PoC remains explicitly insecure and reports `final-verified=false`, including after successful Catalog publication.
+
+The `mock` resolver may still install local development fixtures, and
+`attestam-insecure` remains a separately labelled connectivity demonstration.
+Neither behavior is authority for the verified protected Catalog.
+
+#### Future verified app lifecycle target (not implemented)
+
+1. Resolve the command against the protected Catalog and request the referenced `twep-app-v1` TC.
+2. Receive and cryptographically verify the app Update, including its TEEP/COSE/SUIT envelope, component identity, payload digest, signer policy, freshness, and live-session binding.
+3. Install the app bytes into protected or otherwise policy-authorized storage without allowing the app TC to modify the Catalog.
+4. Re-read the protected Catalog entry, authorize the installed app version and digest, and only then load it into a general-app WAMR instance.
+5. Execute the app with no hostcalls and return its CBOR result.
+
+Every transition in this future flow—app TC acceptance, protected installation,
+Catalog-to-app authorization, and post-install execution—is unimplemented in
+M9.2. This section defines a target, not a current security claim.
 
 ## Persistence
 

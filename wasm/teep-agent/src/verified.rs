@@ -40,126 +40,16 @@ const PROTECTED_REVOCATION_STATE_OBJECT: &[u8] = b"protected-revocation-state.cb
 const PROTECTED_AGENT_IDENTITY_OBJECT: &[u8] = b"protected-agent-identity.cbor";
 const PROTECTED_VERIFIED_EVIDENCE_RESULT_OBJECT: &[u8] = b"verified-evidence-result.cbor";
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VerificationStep {
-    CoseOuter,
-    SessionToken,
-    SuitAuth,
-    SequenceFreshness,
-    TrustAnchor,
-    Evidence,
-    AgentIdentity,
-}
+mod diagnostics;
+mod state;
 
-impl VerificationStep {
-    pub fn code(self) -> &'static [u8] {
-        match self {
-            VerificationStep::CoseOuter => b"teep.cose_outer_unverified",
-            VerificationStep::SessionToken => b"teep.session_unbound",
-            VerificationStep::SuitAuth => b"teep.suit_auth_unverified",
-            VerificationStep::SequenceFreshness => b"teep.sequence_unverified",
-            VerificationStep::TrustAnchor => b"teep.trust_anchor_unbound",
-            VerificationStep::Evidence => b"teep.evidence_unaffirmed",
-            VerificationStep::AgentIdentity => b"teep.agent_identity_unbound",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct VerificationState {
-    cose_outer_verified: bool,
-    session_token_bound: bool,
-    suit_auth_verified: bool,
-    sequence_fresh: bool,
-    trust_anchor_bound: bool,
-    evidence_affirming: bool,
-    agent_identity_bound: bool,
-}
+pub(crate) use diagnostics::verification_state_text;
+pub use state::VerificationState;
+#[cfg(test)]
+pub use state::VerificationStep;
 
 pub(crate) enum LiveUpdateAcceptance {
     CatalogCommitted { success_payload: Vec<u8> },
-}
-
-impl VerificationState {
-    pub fn mark_cose_outer_verified(&mut self) {
-        self.cose_outer_verified = true;
-    }
-
-    pub fn cose_outer_verified(&self) -> bool {
-        self.cose_outer_verified
-    }
-
-    pub fn mark_session_token_bound(&mut self) {
-        self.session_token_bound = true;
-    }
-
-    pub fn mark_suit_auth_verified(&mut self) {
-        self.suit_auth_verified = true;
-    }
-
-    pub fn mark_sequence_fresh(&mut self) {
-        self.sequence_fresh = true;
-    }
-
-    pub fn mark_trust_anchor_bound(&mut self) {
-        self.trust_anchor_bound = true;
-    }
-
-    pub fn mark_evidence_affirming(&mut self) {
-        self.evidence_affirming = true;
-    }
-
-    pub fn set_evidence_affirming(&mut self, value: bool) {
-        self.evidence_affirming = value;
-    }
-
-    pub fn mark_agent_identity_bound(&mut self) {
-        self.agent_identity_bound = true;
-    }
-
-    pub fn set_agent_identity_bound(&mut self, value: bool) {
-        self.agent_identity_bound = value;
-    }
-
-    pub fn first_missing_step(&self) -> Option<VerificationStep> {
-        if !self.cose_outer_verified {
-            Some(VerificationStep::CoseOuter)
-        } else if !self.session_token_bound {
-            Some(VerificationStep::SessionToken)
-        } else if !self.suit_auth_verified {
-            Some(VerificationStep::SuitAuth)
-        } else if !self.sequence_fresh {
-            Some(VerificationStep::SequenceFreshness)
-        } else {
-            None
-        }
-    }
-
-    pub fn fixture_verified(&self) -> bool {
-        self.first_missing_step().is_none()
-    }
-
-    pub fn final_verified(&self) -> bool {
-        self.fixture_verified()
-            && self.trust_anchor_bound
-            && self.evidence_affirming
-            && self.agent_identity_bound
-            && credential_management::credential_model_ready()
-    }
-
-    pub fn first_missing_final_step(&self) -> Option<VerificationStep> {
-        self.first_missing_step().or({
-            if !self.trust_anchor_bound {
-                Some(VerificationStep::TrustAnchor)
-            } else if !self.evidence_affirming {
-                Some(VerificationStep::Evidence)
-            } else if !self.agent_identity_bound {
-                Some(VerificationStep::AgentIdentity)
-            } else {
-                None
-            }
-        })
-    }
 }
 
 pub(crate) fn run_verified_dry_run(out_desc_ptr: u32, requested_component_id: &[u8]) -> i32 {
@@ -932,40 +822,6 @@ fn unsupported_agent_identity_status() -> AgentIdentityStatus {
         load_status: AgentIdentityLoadStatus::Unsupported,
         ..absent_agent_identity_status()
     }
-}
-
-pub(crate) fn verification_state_text(state: &VerificationState) -> Option<Vec<u8>> {
-    let mut out = Vec::new();
-    out.extend_from_slice(b"cose-outer-verified=");
-    append_bool_text(&mut out, state.cose_outer_verified);
-    out.extend_from_slice(b"\nsession-token-bound=");
-    append_bool_text(&mut out, state.session_token_bound);
-    out.extend_from_slice(b"\nsuit-auth-verified=");
-    append_bool_text(&mut out, state.suit_auth_verified);
-    out.extend_from_slice(b"\nsequence-fresh=");
-    append_bool_text(&mut out, state.sequence_fresh);
-    out.extend_from_slice(b"\nevidence-affirming=");
-    append_bool_text(&mut out, state.evidence_affirming);
-    out.extend_from_slice(b"\nagent-identity-bound=");
-    append_bool_text(&mut out, state.agent_identity_bound);
-    out.extend_from_slice(b"\nfixture-verified=");
-    append_bool_text(&mut out, state.fixture_verified());
-    out.extend_from_slice(b"\ntrust-anchor-bound=");
-    append_bool_text(&mut out, state.trust_anchor_bound);
-    out.extend_from_slice(b"\nfinal-verified=");
-    append_bool_text(&mut out, state.final_verified());
-    out.extend_from_slice(b"\nmissing-step=");
-    match state.first_missing_step() {
-        Some(step) => out.extend_from_slice(step.code()),
-        None => out.extend_from_slice(b"none"),
-    }
-    out.extend_from_slice(b"\nfinal-missing-step=");
-    match state.first_missing_final_step() {
-        Some(step) => out.extend_from_slice(step.code()),
-        None => out.extend_from_slice(b"none"),
-    }
-    out.push(b'\n');
-    Some(out)
 }
 
 pub(crate) fn verified_dry_run_state(input: &[u8]) -> Option<VerificationState> {

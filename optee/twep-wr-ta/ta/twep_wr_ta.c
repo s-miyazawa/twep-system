@@ -10,8 +10,9 @@
 #include <tee_internal_api_extensions.h>
 
 #include "acceptance_state.h"
+#include "ta_internal.h"
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 #include <wasm_export.h>
 #endif
 
@@ -43,6 +44,29 @@
 	"time=false\n" \
 	"final-verified=false\n"
 
+static bool d047_object_name_reserved(const char *name, uint32_t name_len)
+{
+	static const char *const reserved[] = {
+		"twep-catalog-state.cbor",
+		"twep-catalog-state.0.cbor",
+		"twep-catalog-state.1.cbor",
+		"teep-agent/twep-catalog-state.cbor",
+		"teep-agent/twep-catalog-state.0.cbor",
+		"teep-agent/twep-catalog-state.1.cbor",
+	};
+	size_t i = 0;
+
+	if (!name)
+		return false;
+	for (i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++) {
+		size_t len = strlen(reserved[i]);
+
+		if (name_len == len && TEE_MemCompare(name, reserved[i], len) == 0)
+			return true;
+	}
+	return false;
+}
+
 static const uint8_t cbor_dry_run_response[] = {
 	0xa2,
 	0x64, 'm', 'o', 'd', 'e',
@@ -66,12 +90,6 @@ static const uint8_t wamr_spike_expected_input[] = {
 	0xa1,
 	0x67, 'c', 'o', 'm', 'm', 'a', 'n', 'd',
 	0x6a, 'h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd',
-};
-
-enum production_envelope_kind {
-	PRODUCTION_ENVELOPE_INIT,
-	PRODUCTION_ENVELOPE_EXECUTE,
-	PRODUCTION_ENVELOPE_RESUME_HOST_IO,
 };
 
 struct cbor_cursor {
@@ -138,7 +156,7 @@ struct pending_host_io_state {
 	char kind_storage[32];
 };
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 struct pending_teep_live_state {
 	bool active;
 	bool catalog_commit_recorded;
@@ -182,7 +200,7 @@ struct teep_agent_live_session {
 
 struct twep_wr_session {
 	struct pending_host_io_state pending_host_io;
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	struct pending_teep_live_state pending_teep_live;
 	struct teep_agent_live_session teep_agent_live_session;
 #endif
@@ -210,7 +228,7 @@ static bool take_d043_runtime_test_fault(uint32_t fault)
 
 #define g_pending_host_io (g_session->pending_host_io)
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 #define g_pending_teep_live (g_session->pending_teep_live)
 #define g_teep_agent_live_session (g_session->teep_agent_live_session)
 static bool g_wamr_runtime_initialized;
@@ -348,7 +366,7 @@ static TEE_Result parse_bool_value(struct cbor_cursor *cur)
 	return TEE_SUCCESS;
 }
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 static TEE_Result parse_uint32_value(struct cbor_cursor *cur, uint32_t *out)
 {
 	uint64_t value = 0;
@@ -399,8 +417,8 @@ static TEE_Result parse_bstr_value_view(struct cbor_cursor *cur,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result parse_production_envelope(const void *buf, size_t len,
-					    enum production_envelope_kind kind,
+static TEE_Result parse_production_envelope(
+	const void *buf, size_t len, enum twep_ta_production_envelope_kind kind,
 					    struct production_envelope_seen *out_seen)
 {
 	struct cbor_cursor cur = { .buf = buf, .len = len, .off = 0 };
@@ -473,16 +491,16 @@ static TEE_Result parse_production_envelope(const void *buf, size_t len,
 	if (cur.off != cur.len)
 		return TEE_ERROR_BAD_FORMAT;
 
-	if (kind == PRODUCTION_ENVELOPE_INIT &&
+	if (kind == TWEP_TA_ENVELOPE_INIT &&
 	    (!seen.resolver_mode || !seen.attestam_url || !seen.insecure ||
 	     !seen.default_timeout_ms || !seen.max_request_size ||
 	     !seen.max_response_size))
 		return TEE_ERROR_BAD_FORMAT;
-	if (kind == PRODUCTION_ENVELOPE_EXECUTE &&
+	if (kind == TWEP_TA_ENVELOPE_EXECUTE &&
 	    (!seen.request_id || !seen.command || !seen.app_input_cbor ||
 	     !seen.request_timeout_ms))
 		return TEE_ERROR_BAD_FORMAT;
-	if (kind == PRODUCTION_ENVELOPE_RESUME_HOST_IO &&
+	if (kind == TWEP_TA_ENVELOPE_RESUME_HOST_IO &&
 	    (!seen.request_id || !seen.host_io_result_cbor))
 		return TEE_ERROR_BAD_FORMAT;
 
@@ -566,7 +584,7 @@ static bool object_name_eq(const char *ptr, uint32_t len, const char *want)
 	return len == want_len && TEE_MemCompare(ptr, want, want_len) == 0;
 }
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 static bool bytes_view_is_safe_command(const struct bytes_view *view)
 {
 	size_t i = 0;
@@ -939,7 +957,7 @@ static bool host_io_result_ok(const struct bytes_view *result)
 	       sequence_ok && request_body_sha_ok && normalized_input_sha_ok;
 }
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 static void pending_teep_live_clear(void)
 {
 	size_t i = 0;
@@ -1160,7 +1178,7 @@ static TEE_Result build_resume_final_response(const struct bytes_view *request_i
 	return TEE_SUCCESS;
 }
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 static void cbor_write_uint64(uint8_t **p, uint64_t n)
 {
 	if (n < 24) {
@@ -2192,19 +2210,6 @@ static bool teep_agent_state_object_allowed(const char *path, uint32_t path_len)
 	return false;
 }
 
-static bool d047_object_name_reserved(const char *name, uint32_t name_len)
-{
-	return object_name_eq(name, name_len, "twep-catalog-state.cbor") ||
-	       object_name_eq(name, name_len, "twep-catalog-state.0.cbor") ||
-	       object_name_eq(name, name_len, "twep-catalog-state.1.cbor") ||
-	       object_name_eq(name, name_len,
-			      "teep-agent/twep-catalog-state.cbor") ||
-	       object_name_eq(name, name_len,
-			      "teep-agent/twep-catalog-state.0.cbor") ||
-	       object_name_eq(name, name_len,
-			      "teep-agent/twep-catalog-state.1.cbor");
-}
-
 static bool teep_agent_protected_object_allowed(const char *object_name,
 						uint32_t object_name_len)
 {
@@ -2616,7 +2621,7 @@ static int32_t teep_host_acceptance_generation(wasm_exec_env_t exec_env,
 {
 	if (!teep_hostcall_context(exec_env) || !generation)
 		return 1;
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	if (g_pending_teep_live.active &&
 	    g_pending_teep_live.catalog_commit_recorded) {
 		*generation =
@@ -2736,7 +2741,7 @@ static int32_t teep_host_commit_catalog(wasm_exec_env_t exec_env,
 		pending_host_io_clear(&g_pending_host_io);
 		return 8;
 	}
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	if (g_pending_teep_live.active &&
 	    g_pending_teep_live.catalog_commit_recorded) {
 		uint64_t current_sequence = 0;
@@ -2788,7 +2793,7 @@ static int32_t teep_host_commit_catalog(wasm_exec_env_t exec_env,
 	if (res != TEE_SUCCESS)
 		IMSG("twep-wr-ta catalog commit failed 0x%x", res);
 	else {
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 		if (g_pending_teep_live.active) {
 			g_pending_teep_live.catalog_commit_recorded = true;
 			TEE_MemMove(
@@ -2829,7 +2834,7 @@ static TEE_Result d043_test_delete_result(void)
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_d043_test(uint32_t param_types, TEE_Param params[4])
+TEE_Result twep_ta_cmd_d043_test(uint32_t param_types, TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(
 		TEE_PARAM_TYPE_VALUE_INOUT, TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -2896,7 +2901,7 @@ static TEE_Result cmd_d043_test(uint32_t param_types, TEE_Param params[4])
 		return res;
 	case TA_TWEP_WR_D043_TEST_GET_PENDING_STATE:
 		params[0].value.b = g_pending_host_io.active ? 1u : 0u;
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 		if (g_pending_teep_live.active)
 			params[0].value.b |= 2u;
 		if (g_teep_agent_live_session.active)
@@ -3423,7 +3428,7 @@ static TEE_Result validate_wamr_spike_input(const TEE_Param *param)
 	return TEE_SUCCESS;
 }
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 static bool read_leb_u32(const uint8_t *bytes, size_t len, size_t *pos,
 			 uint32_t *value)
 {
@@ -3471,7 +3476,7 @@ static bool wasm_has_import_section(const void *wasm, size_t wasm_len)
 }
 #endif
 
-static TEE_Result cmd_ping(uint32_t param_types, TEE_Param params[4])
+TEE_Result twep_ta_cmd_ping(uint32_t param_types, TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
 						 TEE_PARAM_TYPE_NONE,
@@ -3486,7 +3491,7 @@ static TEE_Result cmd_ping(uint32_t param_types, TEE_Param params[4])
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_get_platform_status(uint32_t param_types,
+TEE_Result twep_ta_cmd_get_platform_status(uint32_t param_types,
 					  TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -3508,7 +3513,7 @@ static TEE_Result cmd_get_platform_status(uint32_t param_types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_measure_wasm(uint32_t param_types,
+TEE_Result twep_ta_cmd_measure_wasm(uint32_t param_types,
 				   TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -3537,7 +3542,7 @@ static TEE_Result cmd_measure_wasm(uint32_t param_types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_secure_storage_put(uint32_t param_types,
+TEE_Result twep_ta_cmd_secure_storage_put(uint32_t param_types,
 					 TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -3611,7 +3616,7 @@ static TEE_Result cmd_secure_storage_put(uint32_t param_types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_secure_storage_get(uint32_t param_types,
+TEE_Result twep_ta_cmd_secure_storage_get(uint32_t param_types,
 					 TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -3689,7 +3694,7 @@ out:
 	return res;
 }
 
-static TEE_Result cmd_get_random(uint32_t param_types, TEE_Param params[4])
+TEE_Result twep_ta_cmd_get_random(uint32_t param_types, TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
 						 TEE_PARAM_TYPE_NONE,
@@ -3706,7 +3711,7 @@ static TEE_Result cmd_get_random(uint32_t param_types, TEE_Param params[4])
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_get_time(uint32_t param_types, TEE_Param params[4])
+TEE_Result twep_ta_cmd_get_time(uint32_t param_types, TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_OUTPUT,
 						 TEE_PARAM_TYPE_NONE,
@@ -3724,7 +3729,7 @@ static TEE_Result cmd_get_time(uint32_t param_types, TEE_Param params[4])
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_cbor_dry_run(uint32_t param_types,
+TEE_Result twep_ta_cmd_cbor_dry_run(uint32_t param_types,
 				   TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -3748,9 +3753,9 @@ static TEE_Result cmd_cbor_dry_run(uint32_t param_types,
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_production_envelope(uint32_t param_types,
+TEE_Result twep_ta_cmd_production_envelope(uint32_t param_types,
 					  TEE_Param params[4],
-					  enum production_envelope_kind kind,
+					  enum twep_ta_production_envelope_kind kind,
 					  const char *label)
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -3779,7 +3784,7 @@ static TEE_Result cmd_production_envelope(uint32_t param_types,
 		return res;
 	}
 
-	if (kind == PRODUCTION_ENVELOPE_EXECUTE &&
+	if (kind == TWEP_TA_ENVELOPE_EXECUTE &&
 	    bytes_view_eq(&seen.command_view, "teep-agent-host-io")) {
 		static const uint8_t body[] = {
 			0xa1, 0x66, 'p', 'r', 'o', 'b', 'e', 0x01
@@ -3801,7 +3806,7 @@ static TEE_Result cmd_production_envelope(uint32_t param_types,
 		return res;
 	}
 
-	if (kind == PRODUCTION_ENVELOPE_EXECUTE &&
+	if (kind == TWEP_TA_ENVELOPE_EXECUTE &&
 	    bytes_view_eq(&seen.command_view, "teep-agent-transcript-limit")) {
 		size_t response_len = 0;
 
@@ -3818,7 +3823,7 @@ static TEE_Result cmd_production_envelope(uint32_t param_types,
 		return res;
 	}
 
-	if (kind == PRODUCTION_ENVELOPE_EXECUTE &&
+	if (kind == TWEP_TA_ENVELOPE_EXECUTE &&
 	    bytes_view_eq(&seen.command_view, "teep-agent-hostcall-http")) {
 		static const uint8_t body[] = {
 			0xa2,
@@ -3847,7 +3852,7 @@ static TEE_Result cmd_production_envelope(uint32_t param_types,
 		return res;
 	}
 
-	if (kind == PRODUCTION_ENVELOPE_EXECUTE &&
+	if (kind == TWEP_TA_ENVELOPE_EXECUTE &&
 	    bytes_view_eq(&seen.command_view, "teep-agent-hostcall-evidence")) {
 		size_t response_len = 0;
 
@@ -3863,10 +3868,10 @@ static TEE_Result cmd_production_envelope(uint32_t param_types,
 		return res;
 	}
 
-	if (kind == PRODUCTION_ENVELOPE_RESUME_HOST_IO) {
+	if (kind == TWEP_TA_ENVELOPE_RESUME_HOST_IO) {
 		size_t response_len = 0;
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 		if (g_pending_teep_live.active)
 			res = resume_pending_teep_live(&seen.request_id_view,
 						       &seen.host_io_result_view,
@@ -3886,9 +3891,9 @@ static TEE_Result cmd_production_envelope(uint32_t param_types,
 		return res;
 	}
 
-	if (kind == PRODUCTION_ENVELOPE_EXECUTE && seen.wasm_view.ptr &&
+	if (kind == TWEP_TA_ENVELOPE_EXECUTE && seen.wasm_view.ptr &&
 	    seen.wasm_view.len) {
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 		char error_buf[128] = { };
 		wasm_module_t module = NULL;
 		wasm_module_inst_t module_inst = NULL;
@@ -4277,14 +4282,14 @@ prod_out:
 	return TEE_SUCCESS;
 }
 
-static TEE_Result cmd_wamr_spike_exec(uint32_t param_types,
+TEE_Result twep_ta_cmd_wamr_spike_exec(uint32_t param_types,
 				      TEE_Param params[4])
 {
 	const uint32_t expected = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 						 TEE_PARAM_TYPE_MEMREF_INPUT,
 						 TEE_PARAM_TYPE_MEMREF_OUTPUT,
 						 TEE_PARAM_TYPE_NONE);
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	char error_buf[128] = { };
 	wasm_module_t module = NULL;
 	wasm_module_inst_t module_inst = NULL;
@@ -4314,7 +4319,7 @@ static TEE_Result cmd_wamr_spike_exec(uint32_t param_types,
 			return input_res;
 	}
 
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	if (!ensure_wamr_runtime()) {
 		EMSG("twep-wr-ta WAMR spike init failed");
 		return TEE_ERROR_GENERIC;
@@ -4470,7 +4475,7 @@ void TA_DestroyEntryPoint(void)
 	g_d043_runtime_test_fault = TA_TWEP_WR_D043_FAULT_NONE;
 	twep_acceptance_test_reset_fault();
 #endif
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	if (g_wamr_runtime_initialized) {
 		wasm_runtime_destroy();
 		g_wamr_runtime_initialized = false;
@@ -4511,7 +4516,7 @@ void TA_CloseSessionEntryPoint(void *session)
 	if (!ctx || g_session)
 		return;
 	g_session = ctx;
-#ifdef TWEP_TA_WAMR_SPIKE_LINK
+#ifdef TWEP_TA_WAMR_LINK
 	teep_agent_live_session_release();
 	pending_teep_live_clear();
 #endif
@@ -4532,58 +4537,7 @@ TEE_Result TA_InvokeCommandEntryPoint(void *session, uint32_t command,
 		return TEE_ERROR_BAD_STATE;
 	g_session = session;
 
-	switch (command) {
-	case TA_TWEP_WR_CMD_PING:
-		res = cmd_ping(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_GET_PLATFORM_STATUS:
-		res = cmd_get_platform_status(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_MEASURE_WASM:
-		res = cmd_measure_wasm(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_SECURE_STORAGE_PUT:
-		res = cmd_secure_storage_put(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_SECURE_STORAGE_GET:
-		res = cmd_secure_storage_get(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_GET_RANDOM:
-		res = cmd_get_random(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_GET_TIME:
-		res = cmd_get_time(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_CBOR_DRY_RUN:
-		res = cmd_cbor_dry_run(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC:
-		res = cmd_wamr_spike_exec(param_types, params);
-		break;
-	case TA_TWEP_WR_CMD_INIT:
-		res = cmd_production_envelope(param_types, params,
-					      PRODUCTION_ENVELOPE_INIT,
-					      "init");
-		break;
-	case TA_TWEP_WR_CMD_EXECUTE:
-		res = cmd_production_envelope(param_types, params,
-					      PRODUCTION_ENVELOPE_EXECUTE,
-					      "execute");
-		break;
-	case TA_TWEP_WR_CMD_RESUME_HOST_IO:
-		res = cmd_production_envelope(param_types, params,
-					      PRODUCTION_ENVELOPE_RESUME_HOST_IO,
-					      "resume-host-io");
-		break;
-#ifdef TWEP_TA_D043_TEST_HOOKS
-	case TA_TWEP_WR_CMD_D043_TEST:
-		res = cmd_d043_test(param_types, params);
-		break;
-#endif
-	default:
-		EMSG("twep-wr-ta unsupported command 0x%x", command);
-		break;
-	}
+	res = twep_ta_dispatch_command(command, param_types, params);
 	g_session = NULL;
 	return res;
 }

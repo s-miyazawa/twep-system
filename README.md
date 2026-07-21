@@ -138,6 +138,7 @@ Saving a Reversed Color Image
 
 The primary public documentation is:
 
+- [docs/Status.md](docs/Status.md) — implemented milestone and decision index; read this first for current behavior
 - [Spec.md](Spec.md) — overall product specification
 - [docs/Architecture.md](docs/Architecture.md) — components and trust boundaries
 - [docs/Interface.md](docs/Interface.md) — IPC and host interfaces
