@@ -14,6 +14,7 @@ srcs-y += ta_basic_commands.c
 srcs-y += ta_secure_storage.c
 srcs-y += ta_wamr_spike.c
 srcs-y += acceptance_state.c
+srcs-y += protected_app.c
 
 ifeq ($(TWEP_TA_D043_TEST_HOOKS),1)
 srcs-y += ta_d043_test.c

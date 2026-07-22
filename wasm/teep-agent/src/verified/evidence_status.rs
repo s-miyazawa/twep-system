@@ -165,6 +165,11 @@ pub(crate) fn protected_evidence_result_is_stale() -> bool {
         && !status.acceptance_generation_current
 }
 
+pub(crate) fn protected_attestam_acceptance_is_current() -> bool {
+    let status = read_evidence_status_from_protected();
+    status.affirming_ready(&platform_status_text())
+}
+
 pub(super) fn read_evidence_status_from_file() -> EvidenceStatus {
     let Some(out_len) = (match host_io::read_file_len(VERIFIED_EVIDENCE_RESULT_PATH) {
         Ok(value) => value,

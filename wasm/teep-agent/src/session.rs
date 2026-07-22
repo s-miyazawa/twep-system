@@ -146,15 +146,53 @@ pub(crate) fn run_resolve_app(
     )
 }
 
-pub(crate) fn run_verified_poc_acceptance(
+pub(crate) fn run_verified_poc_resolve(
     out_desc_ptr: u32,
+    target_command: &[u8],
     attestam_url: &[u8],
-    requested_component_id: &[u8],
+    app_component_id: &[u8],
 ) -> i32 {
+    #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+    let catalog = host_io::read_file_alloc(CATALOG_PATH, 65_536);
+    #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+    if let Some(catalog) = catalog.as_deref() {
+        if !crate::catalog_validator::validate_authoritative_catalog(catalog) {
+            return write_output(
+                out_desc_ptr,
+                &error_output(b"catalog.invalid", b"protected Catalog is invalid"),
+            );
+        }
+        if !crate::catalog::authorizes_command(catalog, target_command) {
+            return write_output(
+                out_desc_ptr,
+                &error_output(b"catalog.not_found", b"target command not found"),
+            );
+        }
+        if crate::catalog::protected_app_is_ready(catalog, target_command) {
+            return resolve_catalog(
+                out_desc_ptr,
+                CATALOG_PATH,
+                target_command,
+                b"tmp/teep-agent-probe",
+                b"verified-protected-app\n",
+            );
+        }
+    }
+    #[cfg(feature = "m9-1-acceptance-only-smoke")]
+    let requested_component_id = app_component_id;
+    #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+    let requested_component_id = if catalog.is_some() {
+        app_component_id.to_vec()
+    } else {
+        match crate::suit::twep_catalog_component_id(b"default") {
+            Some(value) => value,
+            None => return 4,
+        }
+    };
     match run_attestam_session(
         out_desc_ptr,
         attestam_url,
-        requested_component_id,
+        requested_component_id.as_ref(),
         SessionPolicy::VerifiedPocAcceptanceOnly,
     ) {
         #[cfg(feature = "m9-1-acceptance-only-smoke")]
@@ -166,13 +204,25 @@ pub(crate) fn run_verified_poc_acceptance(
             ),
         ),
         #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
-        Ok(Some(true)) => write_output(
-            out_desc_ptr,
-            &error_output(
-                b"teep.verified_required",
-                b"insecure PoC Catalog committed; app installation remains blocked",
-            ),
-        ),
+        Ok(Some(true)) => {
+            if catalog.is_some() {
+                resolve_catalog(
+                    out_desc_ptr,
+                    CATALOG_PATH,
+                    target_command,
+                    b"tmp/teep-agent-probe",
+                    b"verified-protected-app\n",
+                )
+            } else {
+                write_output(
+                    out_desc_ptr,
+                    &error_output(
+                        b"teep.verified_required",
+                        b"protected Catalog committed; rerun to install and execute app",
+                    ),
+                )
+            }
+        }
         Ok(_) => write_output(
             out_desc_ptr,
             &error_output(

@@ -5,6 +5,7 @@ Read only the documents needed for the task after classifying it.
 ## Always-On Rules
 
 - Check `git status --short` before editing, and preserve unrelated user changes.
+- This repository is a small academic reference implementation, not a product platform. Prefer the least code and the most direct design that clearly demonstrates the protocol and trust boundaries; prioritize readability over generality, extensibility, operational completeness, or production credential lifecycle features. Do not add frameworks, provider layers, background services, multi-profile machinery, or speculative abstractions unless the current PoC requires them or the user explicitly approves them.
 - `twep-wr` is the public C ABI boundary. Go must not call WAMR or the OP-TEE TA directly, and public C ABI v3 changes require explicit approval and synchronized documentation.
 - `docs/ABI.md` is authoritative for Wasm ABI, hostcalls, CBOR schemas, TA envelopes, diagnostic keys, and compatibility rules.
 - Only a verified `twep-catalog-v1` Catalog TC may authorize a protected Catalog update. App TCs, REE files, debug JSON, management API data, and personalization data are not Catalog authorities.

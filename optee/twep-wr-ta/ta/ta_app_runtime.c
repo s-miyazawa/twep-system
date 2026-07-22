@@ -294,6 +294,36 @@ out:
 	return res;
 }
 
+TEE_Result twep_load_protected_app(struct bytes_view *app, uint8_t **owned,
+				   uint8_t digest[32])
+{
+	size_t app_len = 0;
+	uint8_t *bytes;
+	TEE_Result res;
+
+	if (!app || !owned)
+		return TEE_ERROR_BAD_PARAMETERS;
+	*owned = NULL;
+	app->ptr = NULL;
+	app->len = 0;
+	res = twep_app_read_active(NULL, 0, &app_len, NULL);
+	if (res != TEE_ERROR_SHORT_BUFFER || !app_len ||
+	    app_len > TWEP_PROTECTED_APP_MAX_SIZE)
+		return res == TEE_SUCCESS ? TEE_ERROR_BAD_FORMAT : res;
+	bytes = TEE_Malloc(app_len, 0);
+	if (!bytes)
+		return TEE_ERROR_OUT_OF_MEMORY;
+	res = twep_app_read_active(bytes, app_len, &app_len, digest);
+	if (res != TEE_SUCCESS) {
+		TEE_Free(bytes);
+		return res;
+	}
+	app->ptr = bytes;
+	app->len = app_len;
+	*owned = bytes;
+	return TEE_SUCCESS;
+}
+
 TEE_Result parse_teep_error_output(const struct bytes_view *output,
 				   struct bytes_view *code,
 				   struct bytes_view *message)
@@ -451,7 +481,8 @@ parse_production_resource_limits_map(struct cbor_cursor *cur,
 
 TEE_Result
 parse_teep_resource_limits_output(const struct bytes_view *output,
-				  struct production_resource_limits *limits)
+				  struct production_resource_limits *limits,
+				  uint8_t app_digest[32])
 {
 	struct cbor_cursor cur = {
 		.buf = output->ptr,
@@ -463,6 +494,7 @@ parse_teep_resource_limits_output(const struct bytes_view *output,
 	bool status_ok = false;
 	bool have_app = false;
 	bool have_limits = false;
+	bool have_digest = false;
 
 	if (!output->ptr || !output->len || !cbor_read_len(&cur, 5, &map_len))
 		return TEE_ERROR_BAD_FORMAT;
@@ -501,6 +533,17 @@ parse_teep_resource_limits_output(const struct bytes_view *output,
 					if (res != TEE_SUCCESS)
 						return res;
 					have_limits = true;
+				} else if (key_eq(app_key, app_key_len,
+						  "sha256")) {
+					struct bytes_view digest = { };
+
+					if (parse_bstr_value_view(&cur, &digest) !=
+						    TEE_SUCCESS ||
+					    digest.len != 32)
+						return TEE_ERROR_BAD_FORMAT;
+					if (app_digest)
+						TEE_MemMove(app_digest, digest.ptr, 32);
+					have_digest = true;
 				} else if (!cbor_skip_item(&cur, 0)) {
 					return TEE_ERROR_BAD_FORMAT;
 				}
@@ -509,7 +552,7 @@ parse_teep_resource_limits_output(const struct bytes_view *output,
 			return TEE_ERROR_BAD_FORMAT;
 		}
 	}
-	if (cur.off != cur.len || !status_ok || !have_app)
+	if (cur.off != cur.len || !status_ok || !have_app || !have_digest)
 		return TEE_ERROR_BAD_FORMAT;
 	return have_limits ? TEE_SUCCESS : TEE_ERROR_ITEM_NOT_FOUND;
 }

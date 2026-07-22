@@ -4,6 +4,7 @@
 #define TWEP_WR_TA_RUNTIME_INTERNAL_H
 
 #include "acceptance_state.h"
+#include "protected_app.h"
 #include "ta_internal.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -97,13 +98,14 @@ struct pending_host_io_state {
 #ifdef TWEP_TA_WAMR_LINK
 struct pending_teep_live_state {
 	bool active;
-	bool catalog_commit_recorded;
-	uint8_t catalog_commit_query_digest[32];
-	uint8_t catalog_commit_payload_digest[32];
-	uint64_t catalog_commit_sequence;
-	uint64_t catalog_commit_expected_generation;
-	uint64_t catalog_commit_new_generation;
-	uint32_t catalog_commit_payload_len;
+	bool component_commit_recorded;
+	uint8_t component_commit_kind;
+	uint8_t component_commit_query_digest[32];
+	uint8_t component_commit_payload_digest[32];
+	uint64_t component_commit_sequence;
+	uint64_t component_commit_expected_generation;
+	uint64_t component_commit_new_generation;
+	uint32_t component_commit_payload_len;
 	uint8_t *wasm;
 	size_t wasm_len;
 	uint8_t *input;
@@ -190,7 +192,7 @@ TWEP_TA_HIDDEN extern size_t g_pending_http_transcript_bytes;
 TWEP_TA_HIDDEN extern bool g_wamr_runtime_initialized;
 TWEP_TA_HIDDEN extern bool g_teep_agent_natives_registered;
 TWEP_TA_HIDDEN extern size_t g_teep_agent_live_session_count;
-TWEP_TA_HIDDEN extern NativeSymbol teep_agent_native_symbols[13];
+TWEP_TA_HIDDEN extern NativeSymbol teep_agent_native_symbols[14];
 #endif
 
 TWEP_TA_HIDDEN TEE_Result build_app_runtime_error_execute_response(
@@ -262,6 +264,9 @@ TWEP_TA_HIDDEN TEE_Result execute_teep_agent_resolve(
 	enum teep_agent_pending_hostcall replay, const uint8_t *replay_payload,
 	size_t replay_payload_len, uint8_t *out, size_t out_size,
 	size_t *out_len);
+TWEP_TA_HIDDEN TEE_Result twep_load_protected_app(struct bytes_view *app,
+						  uint8_t **owned,
+						  uint8_t digest[32]);
 TWEP_TA_HIDDEN TEE_Result extract_stdout_view(const uint8_t *app_output,
 					      size_t app_output_len,
 					      struct bytes_view *stdout_view);
@@ -286,7 +291,8 @@ TWEP_TA_HIDDEN TEE_Result parse_teep_resolve_input(
 	const struct bytes_view *input, struct teep_resolve_input *out);
 TWEP_TA_HIDDEN TEE_Result
 parse_teep_resource_limits_output(const struct bytes_view *output,
-				  struct production_resource_limits *limits);
+				  struct production_resource_limits *limits,
+				  uint8_t app_digest[32]);
 TWEP_TA_HIDDEN TEE_Result parse_text_value_view(struct cbor_cursor *cur,
 						struct bytes_view *view);
 TWEP_TA_HIDDEN TEE_Result parse_uint32_value(struct cbor_cursor *cur,

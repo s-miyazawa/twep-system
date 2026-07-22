@@ -110,11 +110,8 @@ pub(super) fn run_attestam_session(
         second_out_len,
         &mut http_buf,
         false,
-        if query_response.evidence_bearing {
-            Some(query_response.cose.as_slice())
-        } else {
-            None
-        },
+        query_response.cose.as_slice(),
+        query_response.evidence_bearing,
     )
     .map(Some)
 }
@@ -125,7 +122,8 @@ fn handle_session_response(
     out_len: u32,
     http_buf: &mut [u8],
     attestation_response: bool,
-    evidence_query_response: Option<&[u8]>,
+    preceding_query_response: &[u8],
+    fresh_evidence: bool,
 ) -> Result<bool, i32> {
     if status == 0 && out_len == 0 {
         if !host_io::write_file(
@@ -199,15 +197,15 @@ fn handle_session_response(
                 &body_payload,
             ),
             SessionPolicy::VerifiedPocAcceptanceOnly => {
-                let Some(evidence_query_response) = evidence_query_response else {
+                if !fresh_evidence && !verified::protected_attestam_acceptance_is_current() {
                     return Err(write_output(
                         context.out_desc_ptr,
                         &error_output(
                             b"teep.protocol",
-                            b"verified PoC Update was not preceded by Evidence",
+                            b"verified PoC Update has neither fresh nor current protected Evidence",
                         ),
                     ));
-                };
+                }
                 let Some(session_token) = context.session_token else {
                     return Err(write_output(
                         context.out_desc_ptr,
@@ -220,14 +218,15 @@ fn handle_session_response(
                 match verified::accept_live_attestam_update_cose(
                     body,
                     context.requested_component_id,
-                    evidence_query_response,
+                    preceding_query_response,
                     session_token,
                 ) {
                     #[cfg(feature = "m9-1-acceptance-only-smoke")]
                     Ok(verified::LiveUpdateAcceptance::AcceptanceCommitted) => Ok(true),
                     #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
-                    Ok(verified::LiveUpdateAcceptance::CatalogCommitted { success_payload }) => {
-                        post_verified_catalog_success(
+                    Ok(verified::LiveUpdateAcceptance::CatalogCommitted { success_payload })
+                    | Ok(verified::LiveUpdateAcceptance::AppCommitted { success_payload }) => {
+                        post_verified_component_success(
                             context.out_desc_ptr,
                             context.attestam_url,
                             &success_payload,
@@ -303,16 +302,13 @@ fn handle_session_response(
         attestation_out_len,
         http_buf,
         true,
-        if attestation_response_cose.evidence_bearing {
-            Some(attestation_response_cose.cose.as_slice())
-        } else {
-            None
-        },
+        attestation_response_cose.cose.as_slice(),
+        attestation_response_cose.evidence_bearing,
     )
 }
 
 #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
-fn post_verified_catalog_success(
+fn post_verified_component_success(
     out_desc_ptr: u32,
     attestam_url: &[u8],
     success_payload: &[u8],
@@ -326,7 +322,7 @@ fn post_verified_catalog_success(
         Err(_) => {
             return Err(write_output(
                 out_desc_ptr,
-                &error_output(b"teep.protocol", b"AttesTAM Catalog Success signing failed"),
+                &error_output(b"teep.protocol", b"AttesTAM Success signing failed"),
             ));
         }
     };
@@ -341,7 +337,7 @@ fn post_verified_catalog_success(
     if status == 5 {
         return Err(write_output(
             out_desc_ptr,
-            &error_output(b"teep.network", b"AttesTAM Catalog Success POST failed"),
+            &error_output(b"teep.network", b"AttesTAM Success POST failed"),
         ));
     }
     if !host_io::write_file(LAST_TEEP_SUCCESS_STATUS_PATH, http_status_text(status)) {

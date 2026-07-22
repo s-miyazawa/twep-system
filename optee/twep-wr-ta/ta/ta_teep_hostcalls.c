@@ -3,6 +3,11 @@
 #include "ta_runtime_internal.h"
 
 #ifdef TWEP_TA_WAMR_LINK
+static TEE_Result teep_encode_attestam_acceptance_result(uint64_t generation,
+							 uint8_t *buf,
+							 uint32_t buf_cap,
+							 uint32_t *out_len);
+
 static struct teep_agent_hostcall_context *
 teep_hostcall_context(wasm_exec_env_t exec_env)
 {
@@ -134,6 +139,20 @@ static int32_t teep_host_read_file(wasm_exec_env_t exec_env, const char *path,
 		return 1;
 	if (object_name_eq(path, path_len, "catalog/catalog.cbor") &&
 	    bytes_view_eq(&ctx->resolver_mode, "attestam-verified")) {
+#ifdef TWEP_TA_WAMR_LINK
+		/*
+		 * A host-I/O resume replays the Agent from its entry point.  Keep
+		 * the protected-state view from the start of this request stable:
+		 * the Catalog committed by this request becomes visible to the next
+		 * top-level request, not to its own deterministic replay.
+		 */
+		if (g_pending_teep_live.active &&
+		    g_pending_teep_live.component_commit_recorded &&
+		    g_pending_teep_live.component_commit_kind == 1) {
+			*out_len = 0;
+			return 3;
+		}
+#endif
 		res = twep_catalog_read_active(buf, buf_cap, &protected_len);
 		*out_len = protected_len > UINT32_MAX ? UINT32_MAX
 						      : (uint32_t)protected_len;
@@ -148,6 +167,34 @@ static int32_t teep_host_read_file(wasm_exec_env_t exec_env, const char *path,
 		if (res == TEE_ERROR_CORRUPT_OBJECT ||
 		    res == TEE_ERROR_BAD_FORMAT ||
 		    res == TEE_ERROR_NOT_SUPPORTED || res == TEE_ERROR_SECURITY)
+			return 4;
+		return 7;
+	}
+	if (path_len > sizeof("apps/") - 1 &&
+	    TEE_MemCompare(path, "apps/", sizeof("apps/") - 1) == 0 &&
+	    bytes_view_eq(&ctx->resolver_mode, "attestam-verified")) {
+#ifdef TWEP_TA_WAMR_LINK
+		/* Apply the same start-of-request snapshot rule to an app commit. */
+		if (g_pending_teep_live.active &&
+		    g_pending_teep_live.component_commit_recorded &&
+		    g_pending_teep_live.component_commit_kind == 2) {
+			*out_len = 0;
+			return 3;
+		}
+#endif
+		res = twep_app_read_active(buf, buf_cap, &protected_len, NULL);
+		*out_len = protected_len > UINT32_MAX ? UINT32_MAX
+						      : (uint32_t)protected_len;
+		if (res == TEE_SUCCESS)
+			return 0;
+		if (res == TEE_ERROR_SHORT_BUFFER)
+			return 2;
+		if (res == TEE_ERROR_ITEM_NOT_FOUND)
+			return 3;
+		if (res == TEE_ERROR_BAD_PARAMETERS)
+			return 1;
+		if (res == TEE_ERROR_CORRUPT_OBJECT ||
+		    res == TEE_ERROR_BAD_FORMAT || res == TEE_ERROR_SECURITY)
 			return 4;
 		return 7;
 	}
@@ -366,12 +413,38 @@ static int32_t teep_host_read_protected(wasm_exec_env_t exec_env,
 					uint32_t object_name_len, uint8_t *buf,
 					uint32_t buf_cap, uint32_t *out_len)
 {
+	uint8_t snapshot[160] = {};
+	uint32_t snapshot_len = 0;
 	TEE_Result res;
 
 	if (!teep_hostcall_context(exec_env) || !out_len)
 		return 1;
 	if (!teep_agent_protected_object_allowed(object_name, object_name_len))
 		return 8;
+	/*
+	 * A commit causes the Agent to replay from its entry point.  Present the
+	 * acceptance result from the start of that request, just as
+	 * teep_host_acceptance_generation() presents the starting generation.
+	 * The replayed commit below still has to match every recorded argument.
+	 */
+	if (g_pending_teep_live.active &&
+	    g_pending_teep_live.component_commit_recorded &&
+	    g_pending_teep_live.component_commit_expected_generation &&
+	    object_name_eq(object_name, object_name_len,
+			   "verified-evidence-result.cbor")) {
+		res = teep_encode_attestam_acceptance_result(
+			g_pending_teep_live.component_commit_expected_generation,
+			snapshot, sizeof(snapshot), &snapshot_len);
+		if (res != TEE_SUCCESS)
+			return 7;
+		*out_len = snapshot_len;
+		if (buf_cap < snapshot_len)
+			return 2;
+		if (!buf)
+			return 1;
+		TEE_MemMove(buf, snapshot, snapshot_len);
+		return 0;
+	}
 
 	*out_len = 0;
 	res = teep_read_persistent_object(object_name, object_name_len, buf,
@@ -628,9 +701,9 @@ static int32_t teep_host_acceptance_generation(wasm_exec_env_t exec_env,
 		return 1;
 #ifdef TWEP_TA_WAMR_LINK
 	if (g_pending_teep_live.active &&
-	    g_pending_teep_live.catalog_commit_recorded) {
+	    g_pending_teep_live.component_commit_recorded) {
 		*generation =
-			g_pending_teep_live.catalog_commit_expected_generation;
+			g_pending_teep_live.component_commit_expected_generation;
 		return 0;
 	}
 #endif
@@ -744,7 +817,7 @@ teep_host_commit_catalog(wasm_exec_env_t exec_env, const uint8_t *digest,
 	}
 #ifdef TWEP_TA_WAMR_LINK
 	if (g_pending_teep_live.active &&
-	    g_pending_teep_live.catalog_commit_recorded) {
+	    g_pending_teep_live.component_commit_recorded) {
 		uint64_t current_sequence = 0;
 		uint64_t current_generation = 0;
 		uint8_t replay_catalog_digest[32] = {};
@@ -752,23 +825,24 @@ teep_host_commit_catalog(wasm_exec_env_t exec_env, const uint8_t *digest,
 		res = twep_ta_sha256_bytes(catalog, catalog_len,
 					   replay_catalog_digest);
 		if (res != TEE_SUCCESS ||
-		    sequence != g_pending_teep_live.catalog_commit_sequence ||
+		    g_pending_teep_live.component_commit_kind != 1 ||
+		    sequence != g_pending_teep_live.component_commit_sequence ||
 		    expected_generation !=
 			    g_pending_teep_live
-				    .catalog_commit_expected_generation ||
+				    .component_commit_expected_generation ||
 		    catalog_len !=
-			    g_pending_teep_live.catalog_commit_payload_len ||
+			    g_pending_teep_live.component_commit_payload_len ||
 		    TEE_MemCompare(
 			    digest,
-			    g_pending_teep_live.catalog_commit_query_digest,
+			    g_pending_teep_live.component_commit_query_digest,
 			    32) != 0 ||
 		    TEE_MemCompare(
 			    catalog_digest,
-			    g_pending_teep_live.catalog_commit_payload_digest,
+			    g_pending_teep_live.component_commit_payload_digest,
 			    32) != 0 ||
 		    TEE_MemCompare(
 			    replay_catalog_digest,
-			    g_pending_teep_live.catalog_commit_payload_digest,
+			    g_pending_teep_live.component_commit_payload_digest,
 			    32) != 0)
 			return 9;
 		res = twep_acceptance_component_sequence(
@@ -777,7 +851,7 @@ teep_host_commit_catalog(wasm_exec_env_t exec_env, const uint8_t *digest,
 		if (res != TEE_SUCCESS || current_sequence != sequence)
 			return 9;
 		*new_generation =
-			g_pending_teep_live.catalog_commit_new_generation;
+			g_pending_teep_live.component_commit_new_generation;
 		IMSG("twep-wr-ta replayed committed Catalog generation %llu",
 		     (unsigned long long)*new_generation);
 		return 0;
@@ -801,24 +875,123 @@ teep_host_commit_catalog(wasm_exec_env_t exec_env, const uint8_t *digest,
 	else {
 #ifdef TWEP_TA_WAMR_LINK
 		if (g_pending_teep_live.active) {
-			g_pending_teep_live.catalog_commit_recorded = true;
+			g_pending_teep_live.component_commit_recorded = true;
+			g_pending_teep_live.component_commit_kind = 1;
 			TEE_MemMove(
-				g_pending_teep_live.catalog_commit_query_digest,
+				g_pending_teep_live.component_commit_query_digest,
 				digest, 32);
 			TEE_MemMove(g_pending_teep_live
-					    .catalog_commit_payload_digest,
+					    .component_commit_payload_digest,
 				    catalog_digest, 32);
-			g_pending_teep_live.catalog_commit_sequence = sequence;
-			g_pending_teep_live.catalog_commit_expected_generation =
+			g_pending_teep_live.component_commit_sequence = sequence;
+			g_pending_teep_live.component_commit_expected_generation =
 				expected_generation;
-			g_pending_teep_live.catalog_commit_new_generation =
+			g_pending_teep_live.component_commit_new_generation =
 				*new_generation;
-			g_pending_teep_live.catalog_commit_payload_len =
+			g_pending_teep_live.component_commit_payload_len =
 				catalog_len;
 		}
 #endif
 		IMSG("twep-wr-ta catalog generation %llu committed",
 		     (unsigned long long)*new_generation);
+	}
+	pending_host_io_clear(&g_pending_host_io);
+	return acceptance_host_status(res);
+}
+
+static int32_t
+teep_host_commit_app(wasm_exec_env_t exec_env, const uint8_t *digest,
+		     uint32_t digest_len, const uint8_t *component_id,
+		     uint32_t component_id_len, uint64_t sequence,
+		     uint64_t expected_generation, const uint8_t *wasm,
+		     uint32_t wasm_len, const uint8_t *wasm_digest,
+		     uint32_t wasm_digest_len, uint64_t *new_generation)
+{
+	struct teep_agent_hostcall_context *ctx = teep_hostcall_context(exec_env);
+	TEE_Result res;
+
+	if (!ctx || !digest || digest_len != 32 ||
+	    !twep_app_component_id_is_valid(component_id, component_id_len) ||
+	    !wasm || !wasm_len || wasm_len > TWEP_PROTECTED_APP_MAX_SIZE ||
+	    !wasm_digest || wasm_digest_len != 32 || !new_generation)
+		return 1;
+	if (!bytes_view_eq(&ctx->resolver_mode, "attestam-verified"))
+		return 8;
+#ifdef TWEP_TA_WAMR_LINK
+	if (g_pending_teep_live.active &&
+	    g_pending_teep_live.component_commit_recorded) {
+		uint64_t current_generation = 0;
+		uint64_t current_sequence = 0;
+		uint8_t replay_digest[32] = { };
+
+		res = twep_ta_sha256_bytes(wasm, wasm_len, replay_digest);
+		if (res != TEE_SUCCESS ||
+		    g_pending_teep_live.component_commit_kind != 2 ||
+		    sequence != g_pending_teep_live.component_commit_sequence ||
+		    expected_generation !=
+			    g_pending_teep_live.component_commit_expected_generation ||
+		    wasm_len != g_pending_teep_live.component_commit_payload_len ||
+		    TEE_MemCompare(digest,
+				   g_pending_teep_live
+					   .component_commit_query_digest,
+				   32) != 0 ||
+		    TEE_MemCompare(wasm_digest,
+				   g_pending_teep_live
+					   .component_commit_payload_digest,
+				   32) != 0 ||
+		    TEE_MemCompare(replay_digest,
+				   g_pending_teep_live
+					   .component_commit_payload_digest,
+				   32) != 0)
+			return 9;
+		res = twep_acceptance_component_sequence(
+			component_id, component_id_len, &current_generation,
+			&current_sequence);
+		if (res != TEE_SUCCESS || current_sequence != sequence)
+			return 9;
+		*new_generation =
+			g_pending_teep_live.component_commit_new_generation;
+		IMSG("twep-wr-ta replayed committed app generation %llu",
+		     (unsigned long long)*new_generation);
+		return 0;
+	}
+#endif
+	if (!g_pending_host_io.active || !g_pending_host_io.http_transcript ||
+	    !bytes_view_eq(&g_pending_host_io.kind, "http_post"))
+		return 9;
+	if (TEE_MemCompare(g_pending_host_io.request_body_sha256, digest, 32) !=
+	    0) {
+		pending_host_io_clear(&g_pending_host_io);
+		return 9;
+	}
+	res = twep_app_commit(digest, component_id, component_id_len, sequence,
+			      expected_generation, wasm, wasm_len, wasm_digest,
+			      new_generation);
+	if (res == TEE_SUCCESS)
+		res = teep_publish_acceptance_result(*new_generation);
+	if (res == TEE_SUCCESS) {
+#ifdef TWEP_TA_WAMR_LINK
+		if (g_pending_teep_live.active) {
+			g_pending_teep_live.component_commit_recorded = true;
+			g_pending_teep_live.component_commit_kind = 2;
+			TEE_MemMove(
+				g_pending_teep_live.component_commit_query_digest,
+				digest, 32);
+			TEE_MemMove(
+				g_pending_teep_live.component_commit_payload_digest,
+				wasm_digest, 32);
+			g_pending_teep_live.component_commit_sequence = sequence;
+			g_pending_teep_live.component_commit_expected_generation =
+				expected_generation;
+			g_pending_teep_live.component_commit_new_generation =
+				*new_generation;
+			g_pending_teep_live.component_commit_payload_len = wasm_len;
+		}
+#endif
+		IMSG("twep-wr-ta app generation %llu committed",
+		     (unsigned long long)*new_generation);
+	} else {
+		IMSG("twep-wr-ta app commit failed 0x%x", res);
 	}
 	pending_host_io_clear(&g_pending_host_io);
 	return acceptance_host_status(res);
@@ -861,7 +1034,7 @@ static uint64_t teep_host_unix_time_ms(wasm_exec_env_t exec_env)
 	return ((uint64_t)time.seconds * 1000) + time.millis;
 }
 
-NativeSymbol teep_agent_native_symbols[13] = {
+NativeSymbol teep_agent_native_symbols[14] = {
 	{"twep_host_log", teep_host_log, "(i*~)", NULL},
 	{"twep_host_read_file", teep_host_read_file, "(*~*~*)i", NULL},
 	{"twep_host_write_file", teep_host_write_file, "(*~*~)i", NULL},
@@ -880,6 +1053,7 @@ NativeSymbol teep_agent_native_symbols[13] = {
 	 "(*~*~II*)i", NULL},
 	{"twep_host_commit_catalog", teep_host_commit_catalog, "(*~*~II*~*~*)i",
 	 NULL},
+	{"twep_host_commit_app", teep_host_commit_app, "(*~*~II*~*~*)i", NULL},
 	{"twep_host_random", teep_host_random, "(*~)i", NULL},
 	{"twep_host_unix_time_ms", teep_host_unix_time_ms, "()I", NULL},
 };

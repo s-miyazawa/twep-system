@@ -63,8 +63,10 @@ use dry_run::{
     line_value_equals, platform_status_text, protected_storage_binding_from_platform_status,
 };
 pub(crate) use dry_run::{run_verified_dry_run, trustzone_live_poc_acceptance_supported};
-pub(crate) use evidence_status::protected_evidence_result_is_stale;
 use evidence_status::*;
+pub(crate) use evidence_status::{
+    protected_attestam_acceptance_is_current, protected_evidence_result_is_stale,
+};
 pub(crate) use live_acceptance::accept_live_attestam_update_cose;
 use live_acceptance::*;
 pub use state::VerificationState;
@@ -76,6 +78,8 @@ pub(crate) enum LiveUpdateAcceptance {
     AcceptanceCommitted,
     #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
     CatalogCommitted { success_payload: Vec<u8> },
+    #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+    AppCommitted { success_payload: Vec<u8> },
 }
 
 pub(crate) fn verified_dry_run_state(input: &[u8]) -> Option<VerificationState> {

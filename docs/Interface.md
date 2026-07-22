@@ -526,7 +526,7 @@ teep-acceptance-state = {
 
 AttesTAM is the Relying Party for Veraison. TEEP_Agent does not receive, parse, or verify a Veraison Attestation Result or EAR. The TEEP_Agent-facing result records only AttesTAM acceptance communicated by a non-empty TAM-signed TEEP Update. The current implementation still uses the compatibility object name `verified-evidence-result.cbor`; new specification text refers to this as the AttesTAM acceptance result object until the persistence name is migrated. Legacy direct-result observations are not final-capable. NoContent and empty responses are not positive decision sources.
 
-For the AttesTAM-specific path, acceptance is communicated by the TAM-signed Update returned in the live challenge-response session after AttesTAM accepts the Evidence-bearing QueryResponse. No additional COSE extension is required. TEEP_Agent verifies the TAM signature and uses the D043 acceptance-generation state for one-time consumption and replay control.
+For the AttesTAM-specific path, acceptance is first communicated by the TAM-signed Update returned in the live challenge-response session after AttesTAM accepts the Evidence-bearing QueryResponse. No additional COSE extension is required. TEEP_Agent verifies the TAM signature and uses the D043 acceptance-generation state for one-time consumption and replay control. If AttesTAM later returns a component Update without a new Evidence challenge, TEEP_Agent accepts it only while that protected acceptance remains current and binds the new commit to the later session's own rolling tokens and exact preceding component-list QueryResponse.
 
 One-time consumption follows D043. This tranche rejects an Update unless it contains exactly one non-empty, sequence-bearing SUIT manifest. `teep-acceptance-state.cbor` advances the consumed digest and that component sequence in one dedicated TA commit. Component keys are the raw encoded SUIT Component Identifier bytes. When both slots are absent and `protected-sequence-freshness.cbor` exists, valid canonical legacy state must be migrated once; only total absence starts empty generation 0. The logical record is then the sole freshness authority, while the old object remains a Linux dry-run and pre-D043 compatibility fixture. The logical record is at most 4096 bytes with at most 32 component entries. It uses two TA-internal slots, complete canonical parsing, and highest-valid-generation selection rather than the non-atomic generic overwrite command; an incomplete or structurally malformed peer is ignored when another valid slot exists, but a complete canonical unsupported-schema peer fails closed. An AttesTAM-derived positive result is current only when its mandatory `acceptance_generation` equals that object's generation. Pending transcript bytes and continuation ownership are bound to a real TA session context and are invalidated, not restored, after session close or restart. A transcript is at most 32 KiB, with at most two pending transcripts and 64 KiB total per TA instance. See `docs/ABI.md` for the authoritative schema and strict validation rules.
 
@@ -663,6 +663,19 @@ int32_t twep_host_commit_catalog(
     uint32_t catalog_sha256_len,
     uint32_t new_generation_ptr);
 
+int32_t twep_host_commit_app(
+    uint32_t query_response_sha256_ptr,
+    uint32_t query_response_sha256_len,
+    uint32_t component_id_ptr,
+    uint32_t component_id_len,
+    uint64_t sequence,
+    uint64_t expected_generation,
+    uint32_t wasm_ptr,
+    uint32_t wasm_len,
+    uint32_t wasm_sha256_ptr,
+    uint32_t wasm_sha256_len,
+    uint32_t new_generation_ptr);
+
 int32_t twep_host_random(
     uint32_t buf_ptr,
     uint32_t buf_len);
@@ -674,6 +687,16 @@ uint64_t twep_host_unix_time_ms(void);
 boundary. It is TEEP-Agent-only and TrustZone-only; generic file writes, the
 REE broker, public Secure Storage commands, and general applications cannot
 publish or select a protected Catalog slot.
+
+`twep_host_commit_app` is the distinct M9.3 protected-app publication boundary.
+Rust TEEP_Agent calls it only after the verified app TC's command and payload
+digest exactly match the active protected Catalog entry. The TA stages one
+inactive protected app record, reopens it, and makes it active through the
+matching D043 component sequence. The record contains one command, its Wasm
+bytes, and digest; two physical slots provide atomic replacement of that one
+active app and are not a general app store. Generic file writes, public Secure
+Storage commands, the REE broker, and general applications cannot publish or
+select these slots.
 
 Return values:
 
@@ -743,10 +766,11 @@ authority path: final verified Catalog updates require a separately verified
 - `read_protected` is for platform protected storage, and `object_name` is a stable object name rather than a path. Object names may contain only `[A-Za-z0-9_.-]`. The Linux backend maps objects to `$STATE/platform/linux/sealed/<object_name>`, but internal platform metadata marks this as `observation-only`, and it is not used for final verified security claims. The TrustZone backend maps this operation to OP-TEE REE FS Secure Storage under `optee/twep-wr-ta/`. The `provision`/`read` subcommands of the OP-TEE host app provide a smoke-test platform provisioning entry point for non-reserved fixture objects; provisioning rejects the D043 positive-result, logical-state, and physical-slot names. `sealed-storage-security=tee-ree-fs-secure-storage` is the protected storage policy for the TrustZone path. `sealed-storage-rollback-protected=false` is not a blocker because rollback attacks are outside this repository's threat model. The SGX/Keystone backends return unsupported until they are mapped to platform-specific sealed storage. No protected-storage write hostcall is currently provided to TEEP_Agent.
 - `platform_status` is an observation hostcall dedicated to TEEP_Agent. It returns the platform backend name, sealed storage security, protected storage support, and file/random/time support as text lines. During an `attestam-verified` dry run, the result is saved to `teep-agent/platform-status.txt`.
 - `twep_host_teep_agent_measurement_sha256` returns the SHA-256 of the TEEP_Agent Wasm bytes loaded by the current runtime. It is used only to bind `protected-agent-identity.cbor` to the runtime-loaded TEEP_Agent. A standalone TrustZone C diagnostic measurement is not a final identity binding.
-- `twep_host_acceptance_generation`, `twep_host_commit_acceptance`, and D047 `twep_host_commit_catalog` are available only to TEEP_Agent and are authoritative only in the TrustZone backend. The Linux backend registers the symbols so TEEP_Agent imports resolve, but returns `unsupported`; Linux therefore remains observation-only and cannot publish D043 acceptance or a protected Catalog.
+- `twep_host_acceptance_generation`, `twep_host_commit_acceptance`, D047 `twep_host_commit_catalog`, and M9.3 `twep_host_commit_app` are available only to TEEP_Agent and are authoritative only in the TrustZone backend. The Linux backend registers the symbols so TEEP_Agent imports resolve, but returns `unsupported`; Linux therefore remains observation-only and cannot publish D043 acceptance, a protected Catalog, or a protected app.
 - `http_post` permits only the AttesTAM URL allowed by the configuration.
 - `attestam-verified` does not use a development Catalog File seed, the `TWEP_CATALOG_CBOR` override, mock app installation, or Catalog/app promotion during M9.1. Linux permits only verified dry-run observation artifacts. TrustZone may run the D045 live PoC acceptance-only path and commit D043 once, then returns `teep.verified_required` without app execution and with `final-verified=false`.
 - During M9.2, TrustZone may accept only `[bstr("twep-catalog-v1"), bstr("default")]`, validate the D047 bounded canonical metadata-only Catalog, and publish it through the dedicated protected two-slot/D043 transaction. The Catalog payload is at most 64 KiB, the complete inbound response at most 128 KiB, and Success follows protected readback. Wasm app bytes remain separate TCs; M9.2 performs no app installation or execution and retains `final-verified=false`.
+- During M9.3, the default TrustZone path first establishes that protected Catalog, then obtains the requested `[bstr("twep-app-v1"), bstr(command)]` TC in a later verified session. Rust authorizes the exact command and digest against the protected Catalog before the TA stores at most one active app of 128 KiB. After protected readback and D043 publication, the same request executes the protected bytes in TA-local WAMR. A later process can execute the protected app without contacting AttesTAM, provided Catalog resolution returns the same digest. The path retains fixed development credentials and `final-verified=false`.
 - Under D046, the live AttesTAM exchange echoes the initial non-empty bounded QueryRequest token in the first signed QueryResponse, then accepts a newly issued non-empty bounded token in the immediate TAM-signed Update. These two tokens need not be byte-equal. The live session is bound by the ordered continuation and exact Evidence QueryResponse transcript consumed by D043. Fixed-input Linux dry-run fixtures continue to require byte equality with `teep-agent/verified-expected-token.bin`.
 - The development mock `create_evidence` uses the fixed development demo key in `attestam-insecure` with `insecure_demo_mode=true` and in the D045 `attestam-verified` PoC path. QueryResponse COSE_Sign1 generation is performed by the development ESP256 signer inside the Rust TEEP_Agent and is not delegated to the Go/REE TEEP_Broker or a C hostcall. `twepd --insecure-demo-agent-key alternate` is the explicit development option for exercising a QueryRequest challenge from a real AttesTAM in either path. The REE side only writes the alternate public COSE_Key to `teep-agent/dev-agent-public-key.cbor`. When this file exists, TEEP_Agent selects the alternate development signer and places the same public key in `cnf.key` of the mock EAT. These signers are explicitly insecure, require no credential-issuance service, and cannot establish `final-verified=true`. The Go/REE side remains IPC, exact-URL HTTP byte transport, and development Evidence production behind the TEEP_Agent-only continuation; COSE/TEEP/SUIT validation and acceptance decisions remain inside TEEP_Agent.
 - An insecure flag is required to disable TLS verification.

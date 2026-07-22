@@ -28,9 +28,10 @@ untrusted network.
   provisioned.
 - `attestam-insecure` is a development compatibility path.
 - `attestam-verified` is a proof-of-concept path and still reports
-  `final-verified=false`. On TrustZone it can accept and protect the metadata-only
-  default Catalog; verified application installation and execution are not a
-  completed final boundary.
+  `final-verified=false`. On TrustZone the default M9.3 academic path protects
+  the default Catalog, authorizes one app by command and exact digest, protects
+  it, and executes it inside the TA. This is a bounded reference flow, not a
+  production trust claim or multi-app deployment system.
 
 The public protocol references are:
 
@@ -237,14 +238,26 @@ make WAMR_DIR="$WAMR_DIR" \
   ATTESTAM_REGISTER_URL="$ATTESTAM_REGISTER_URL" \
   VERAISON_PROVISION_URL="$VERAISON_PROVISION_URL" \
   smoke-optee-trustzone-attestam-verified-catalog
+
+make WAMR_DIR="$WAMR_DIR" \
+  OPTEE_BUILDROOT_TOOLCHAIN="$OPTEE_BUILDROOT_TOOLCHAIN" \
+  OPTEE_POSTRUN="$OPTEE_POSTRUN" \
+  ATTESTAM_URL="$ATTESTAM_URL" \
+  ATTESTAM_REGISTER_URL="$ATTESTAM_REGISTER_URL" \
+  VERAISON_PROVISION_URL="$VERAISON_PROVISION_URL" \
+  smoke-optee-trustzone-attestam-verified-app
 ```
 
-The acceptance target checks that only a live TAM-signed Update bound to the
-Evidence session can publish the one-time D043 acceptance generation. The
-Catalog target checks inactive-slot staging, readback validation, atomic
-activation, replay rejection, and failure preservation. Both retain
-`final-verified=false`; neither proves completed verified application
-installation and execution.
+The acceptance target preserves the historical M9.1 stopping point. The Catalog
+target checks the historical M9.2 inactive-slot and D043 publication boundary.
+The app target checks the default M9.3 sequence: Catalog publication, a later
+app Update authorized by the protected Catalog, TA-local execution, and an
+offline restart execution from protected state. The current AttesTAM normally
+returns that later app Update directly after the new session's component-list
+QueryResponse; the TEEP Agent therefore requires the existing protected
+acceptance generation to remain current and binds the Update to the new
+session's rolling tokens and exact preceding QueryResponse. All retain
+`final-verified=false` because they use fixed development credentials.
 
 ## Expected behavior and troubleshooting
 

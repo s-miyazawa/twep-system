@@ -15,6 +15,26 @@ struct AppEntry<'a> {
     resource_limits: Option<&'a [u8]>,
 }
 
+pub(crate) fn authorizes_app_payload(
+    catalog: &[u8],
+    command: &[u8],
+    payload_sha256: &[u8; 32],
+) -> bool {
+    catalog_entry(catalog, command)
+        .map(|entry| entry.sha256 == payload_sha256)
+        .unwrap_or(false)
+}
+
+pub(crate) fn protected_app_is_ready(catalog: &[u8], command: &[u8]) -> bool {
+    catalog_entry(catalog, command)
+        .map(|entry| verify_app_file(&entry) == 0)
+        .unwrap_or(false)
+}
+
+pub(crate) fn authorizes_command(catalog: &[u8], command: &[u8]) -> bool {
+    catalog_entry(catalog, command).is_ok()
+}
+
 pub(crate) fn resolve_from_catalog(
     out_desc_ptr: u32,
     catalog: &[u8],
@@ -241,4 +261,46 @@ fn resolve_output(entry: &AppEntry<'_>) -> Option<Vec<u8>> {
         out.extend_from_slice(limits);
     }
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn one_app_catalog(digest: &[u8; 32]) -> Vec<u8> {
+        let mut out = Vec::new();
+        cbor::write_map(&mut out, 1).unwrap();
+        cbor::write_text(&mut out, b"apps").unwrap();
+        cbor::write_map(&mut out, 1).unwrap();
+        cbor::write_text(&mut out, b"remotehello").unwrap();
+        cbor::write_map(&mut out, 6).unwrap();
+        cbor::write_text(&mut out, b"abi").unwrap();
+        cbor::write_text(&mut out, b"twep-app-v1").unwrap();
+        cbor::write_text(&mut out, b"sha256").unwrap();
+        cbor::write_bytes(&mut out, digest).unwrap();
+        cbor::write_text(&mut out, b"version").unwrap();
+        cbor::write_text(&mut out, b"1").unwrap();
+        cbor::write_text(&mut out, b"wasm_file").unwrap();
+        cbor::write_text(&mut out, b"remotehello.wasm").unwrap();
+        cbor::write_text(&mut out, b"component_id").unwrap();
+        cbor::write_text(&mut out, b"twep-app-v1/remotehello").unwrap();
+        cbor::write_text(&mut out, b"display_name").unwrap();
+        cbor::write_text(&mut out, b"Remote Hello").unwrap();
+        out
+    }
+
+    #[test]
+    fn protected_catalog_authorizes_only_the_named_payload_digest() {
+        let digest = sha256(b"verified app");
+        let catalog = one_app_catalog(&digest);
+
+        assert!(authorizes_command(&catalog, b"remotehello"));
+        assert!(authorizes_app_payload(&catalog, b"remotehello", &digest));
+        assert!(!authorizes_app_payload(
+            &catalog,
+            b"remotehello",
+            &sha256(b"different app")
+        ));
+        assert!(!authorizes_command(&catalog, b"other"));
+    }
 }

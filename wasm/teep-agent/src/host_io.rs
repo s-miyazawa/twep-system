@@ -64,6 +64,20 @@ extern "C" {
         catalog_sha256_len: u32,
         new_generation_ptr: u32,
     ) -> i32;
+    #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+    fn twep_host_commit_app(
+        digest_ptr: u32,
+        digest_len: u32,
+        component_id_ptr: u32,
+        component_id_len: u32,
+        sequence: u64,
+        expected_generation: u64,
+        wasm_ptr: u32,
+        wasm_len: u32,
+        wasm_sha256_ptr: u32,
+        wasm_sha256_len: u32,
+        new_generation_ptr: u32,
+    ) -> i32;
     fn twep_host_random(buf_ptr: u32, buf_len: u32) -> i32;
     fn twep_host_unix_time_ms() -> u64;
 }
@@ -325,6 +339,38 @@ pub(crate) fn commit_catalog(
             catalog.len() as u32,
             catalog_sha256.as_ptr() as u32,
             catalog_sha256.len() as u32,
+            &mut generation as *mut u64 as u32,
+        )
+    };
+    if status == 0 {
+        Ok(generation)
+    } else {
+        Err(status)
+    }
+}
+
+#[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+pub(crate) fn commit_app(
+    digest: &[u8; 32],
+    component_id: &[u8],
+    sequence: u64,
+    expected_generation: u64,
+    wasm: &[u8],
+    wasm_sha256: &[u8; 32],
+) -> Result<u64, i32> {
+    let mut generation = 0u64;
+    let status = unsafe {
+        twep_host_commit_app(
+            digest.as_ptr() as u32,
+            digest.len() as u32,
+            component_id.as_ptr() as u32,
+            component_id.len() as u32,
+            sequence,
+            expected_generation,
+            wasm.as_ptr() as u32,
+            wasm.len() as u32,
+            wasm_sha256.as_ptr() as u32,
+            wasm_sha256.len() as u32,
             &mut generation as *mut u64 as u32,
         )
     };

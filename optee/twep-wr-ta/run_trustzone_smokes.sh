@@ -8,7 +8,7 @@ PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=optee_example_twep_wr_ta
 
 usage() {
-	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
+	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|attestam-verified-app|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
 }
 
 reset_guest_secure_storage() {
@@ -507,6 +507,122 @@ run_attestam_verified_catalog() {
 	echo "TrustZone AttesTAM verified Catalog smoke ok"
 }
 
+run_verified_app_once() {
+	phase="$1"
+	url="$2"
+	sock="${verified_app_state}/run/twepd.sock"
+	log="${verified_app_state}/twepd-${phase}.log"
+	rm -f "${sock}"
+	(cd "${PROJECT_DIR}/guest" && twepd \
+		--socket "${sock}" \
+		--state-dir "${verified_app_state}" \
+		--resolver-mode attestam-verified \
+		--attestam-url "${url}" \
+		--insecure-demo-agent-key alternate \
+		--once >"${log}" 2>&1) &
+	pid=$!
+	i=0
+	while [ "${i}" -lt 50 ] && [ ! -S "${sock}" ]; do
+		sleep 0.1
+		i=$((i + 1))
+	done
+	if [ ! -S "${sock}" ]; then
+		cat "${log}" || true
+		kill "${pid}" 2>/dev/null || true
+		wait "${pid}" 2>/dev/null || true
+		echo "twepd socket not ready during ${phase}" >&2
+		exit 1
+	fi
+	set +e
+	(cd "${PROJECT_DIR}/guest" && twep-cli --socket "${sock}" helloworld) \
+		>"${verified_app_state}/twep-cli-${phase}.out" \
+		2>"${verified_app_state}/twep-cli-${phase}.err"
+	verified_app_cli_status=$?
+	wait "${pid}"
+	verified_app_daemon_status=$?
+	set -e
+	if [ "${verified_app_daemon_status}" -ne 0 ]; then
+		cat "${log}" || true
+		exit "${verified_app_daemon_status}"
+	fi
+}
+
+run_attestam_verified_app() {
+	verified_app_state="/tmp/twep-trustzone-attestam-verified-app-state"
+	attestam_url="${ATTESTAM_URL:-http://10.0.2.2:8080/tam}"
+
+	rm -rf "${verified_app_state}"
+	mkdir -p "${verified_app_state}/run"
+	for object_name in \
+		protected-credential-store.cbor \
+		protected-issuer-allowlist.cbor \
+		protected-store-freshness.cbor \
+		protected-revocation-state.cbor \
+		protected-agent-identity.cbor
+	do
+		"${APP}" provision "${object_name}" \
+			"${PROJECT_DIR}/guest/fixtures/${object_name}"
+	done
+
+	# The first request installs only the independent default Catalog TC.
+	run_verified_app_once catalog "${attestam_url}"
+	if [ "${verified_app_cli_status}" -eq 0 ] ||
+	   ! grep -q "teep.verified_required" \
+		"${verified_app_state}/twep-cli-catalog.err"; then
+		cat "${verified_app_state}/twep-cli-catalog.out" || true
+		cat "${verified_app_state}/twep-cli-catalog.err" || true
+		cat "${verified_app_state}/twepd-catalog.log" || true
+		echo "verified Catalog phase did not request the app TC" >&2
+		exit 1
+	fi
+	echo "Verified Catalog committed"
+
+	# The next request obtains the app TC, commits it, and executes it only
+	# after the protected Catalog command/digest check succeeds.
+	run_verified_app_once install "${attestam_url}"
+	if [ "${verified_app_cli_status}" -ne 0 ] ||
+	   ! grep -q "Hello, World!!" \
+		"${verified_app_state}/twep-cli-install.out"; then
+		cat "${verified_app_state}/twep-cli-install.out" || true
+		cat "${verified_app_state}/twep-cli-install.err" || true
+		cat "${verified_app_state}/twepd-install.log" || true
+		echo "verified app was not installed and executed" >&2
+		exit 1
+	fi
+	echo "Verified app installed and executed"
+
+	# A fresh process/session must resolve and execute protected state without
+	# contacting AttesTAM. The URL is deliberately unreachable.
+	run_verified_app_once restart "http://127.0.0.1:1/tam"
+	if [ "${verified_app_cli_status}" -ne 0 ] ||
+	   ! grep -q "Hello, World!!" \
+		"${verified_app_state}/twep-cli-restart.out"; then
+		cat "${verified_app_state}/twep-cli-restart.out" || true
+		cat "${verified_app_state}/twep-cli-restart.err" || true
+		cat "${verified_app_state}/twepd-restart.log" || true
+		echo "protected app did not survive restart/offline execution" >&2
+		exit 1
+	fi
+	echo "Protected app restart and offline execution ok"
+
+	for forbidden in \
+		"${verified_app_state}/catalog/catalog.cbor" \
+		"${verified_app_state}/apps/helloworld.wasm"
+	do
+		if [ -e "${forbidden}" ]; then
+			echo "verified app escaped protected storage: ${forbidden}" >&2
+			exit 1
+		fi
+	done
+	twep-cli diagnose verified --state-dir "${verified_app_state}" \
+		>"${verified_app_state}/diagnose.txt"
+	cat "${verified_app_state}/twep-cli-install.out"
+	cat "${verified_app_state}/twep-cli-restart.out"
+	cat "${verified_app_state}/diagnose.txt"
+	grep -q "final-verified=false" "${verified_app_state}/diagnose.txt"
+	echo "TrustZone AttesTAM verified app smoke ok"
+}
+
 run_host_io_resume() {
 	"${APP}" host-io-resume >"/tmp/twep-trustzone-host-io-resume.log"
 	grep -q "TA production host io requested ok" "/tmp/twep-trustzone-host-io-resume.log"
@@ -795,6 +911,9 @@ attestam-verified-acceptance)
 	;;
 attestam-verified-catalog)
 	run_attestam_verified_catalog
+	;;
+attestam-verified-app)
+	run_attestam_verified_app
 	;;
 host-io-resume)
 	run_host_io_resume

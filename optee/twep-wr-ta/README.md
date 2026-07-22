@@ -299,6 +299,7 @@ run_trustzone_smokes.sh public-abi-execute-negaposi
 run_trustzone_smokes.sh attestam-live
 run_trustzone_smokes.sh attestam-verified-acceptance
 run_trustzone_smokes.sh attestam-verified-catalog
+run_trustzone_smokes.sh attestam-verified-app
 run_trustzone_smokes.sh host-io-resume
 run_trustzone_smokes.sh host-io-resume-negative
 run_trustzone_smokes.sh sha256-boundary-negative
@@ -327,6 +328,12 @@ corresponding repository-root `make smoke-optee-trustzone-*` targets; those
 targets build with `TWEP_TA_D043_TEST_HOOKS=1` and remove the hook-enabled host
 and TA artifacts when the run ends. An ordinary build does not expose the D043
 test command.
+
+The `attestam-verified-app` mode is the bounded M9.3 academic flow. It first
+publishes the protected Catalog, then obtains and publishes one Catalog-matched
+app, executes it in TA-local WAMR, and finally starts fresh host processes to
+execute the protected app with an unreachable TAM URL. It deliberately keeps
+the fixed development credential boundary and `final-verified=false`.
 
 `all` runs only the bundled guest checkpoint:
 `default`, `diagnose`, and `provision`. Run the other modes individually, or

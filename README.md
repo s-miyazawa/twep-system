@@ -37,9 +37,11 @@ TEEP Agent, and OP-TEE secure storage:
 The repository includes mock and explicitly insecure AttesTAM demonstration
 modes alongside work toward a verified TEEP/COSE/SUIT path. Do not interpret a
 successful demo as a production security claim. In particular,
-`attestam-insecure` uses development credentials and `attestam-verified`
-retains `final-verified=false` until the complete verified application
-installation and execution boundary is implemented.
+`attestam-insecure` uses development credentials. The TrustZone
+`attestam-verified` academic path can protect a Catalog and one requested app,
+authorize the app digest, and execute it inside the TA, but still retains
+`final-verified=false` because the Evidence and credentials are fixed
+development fixtures rather than a production trust chain.
 
 The private keys embedded in `internal/demokeys`, `internal/teepbroker`, and
 the TEEP Agent sources are intentionally insecure, public, demo-only fixtures.

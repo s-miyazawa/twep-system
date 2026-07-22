@@ -153,6 +153,9 @@ twep_ta_cmd_production_envelope(uint32_t param_types, TEE_Param params[4],
 #ifdef TWEP_TA_WAMR_LINK
 		struct production_resource_limits resource_limits = {};
 		size_t response_len = 0;
+		uint8_t *protected_app_owned = NULL;
+		uint8_t authorized_app_digest[32] = {};
+		uint8_t protected_app_digest[32] = {};
 
 		bool command_is_helloworld =
 			seen.command_view.len == strlen("helloworld") &&
@@ -336,19 +339,32 @@ twep_ta_cmd_production_envelope(uint32_t param_types, TEE_Param params[4],
 				TEE_Free(teep_output);
 				return res;
 			}
-			if (resolver_is_attestam_verified) {
-				TEE_Free(teep_output);
-				return TEE_ERROR_SECURITY;
-			}
 			res = parse_teep_resource_limits_output(
-				&teep_result, &resource_limits);
+				&teep_result, &resource_limits,
+				authorized_app_digest);
 			if (res != TEE_SUCCESS &&
 			    res != TEE_ERROR_ITEM_NOT_FOUND) {
 				TEE_Free(teep_output);
 				return res;
 			}
 			res = TEE_SUCCESS;
-			app_runtime_wasm = seen.app_wasm_view;
+			if (resolver_is_attestam_verified) {
+				res = twep_load_protected_app(
+					&app_runtime_wasm, &protected_app_owned,
+					protected_app_digest);
+				if (res != TEE_SUCCESS) {
+					TEE_Free(teep_output);
+					return res;
+				}
+				if (TEE_MemCompare(authorized_app_digest,
+						   protected_app_digest, 32) != 0) {
+					TEE_Free(protected_app_owned);
+					TEE_Free(teep_output);
+					return TEE_ERROR_SECURITY;
+				}
+			} else {
+				app_runtime_wasm = seen.app_wasm_view;
+			}
 			IMSG("twep-wr-ta production teep-agent resolved app");
 			TEE_Free(teep_output);
 		}
@@ -357,6 +373,8 @@ twep_ta_cmd_production_envelope(uint32_t param_types, TEE_Param params[4],
 			&seen.app_input_view, &app_runtime_wasm,
 			&resource_limits, params[1].memref.buffer,
 			params[1].memref.size, &response_len);
+		if (protected_app_owned)
+			TEE_Free(protected_app_owned);
 		params[1].memref.size = response_len;
 		if (res == TEE_SUCCESS) {
 			if (command_is_calcadd)

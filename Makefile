@@ -13,7 +13,7 @@ OPTEE_TWEP_WR_BUILD_DIR ?= build/twep-wr-trustzone-optee
 WASM_SIGNER_DEPS := cmd/twep-wasm-sign/main.go internal/wasmsign/wasmsign.go internal/demokeys/keys.go
 TEEP_AGENT_TEST_DEPS := $(wildcard wasm/teep-agent/src/verified/tests/*.rs)
 
-.PHONY: fmt build build-optee-trustzone test check-optee-trustzone-smokes e2e e2e-attestam-insecure e2e-attestam-live attestam-remotehello-fixture register-attestam-remotehello-fixture attestam-helloworld-fixture register-attestam-helloworld-fixture attestam-catalog-fixture attestam-catalog-test-fixtures register-attestam-catalog-fixture veraison-generic-eat-corim provision-veraison-generic-eat-fixture smoke-attestam-insecure smoke-attestam-challenge-observe m10-trustzone-checkpoint smoke-optee-trustzone smoke-optee-trustzone-failures smoke-optee-trustzone-abi-vectors smoke-optee-trustzone-execute-abi-negative smoke-optee-trustzone-execute-helloworld smoke-optee-trustzone-execute-calcadd smoke-optee-trustzone-execute-negaposi smoke-optee-trustzone-execute-hostcall-negative smoke-optee-trustzone-execute-cleanup-negative smoke-optee-trustzone-execute-catalog-resource-negative smoke-optee-trustzone-teep-agent-resolve smoke-optee-trustzone-teep-agent-resolve-hash-negative smoke-optee-trustzone-teep-agent-resolve-catalog-negative smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative smoke-optee-trustzone-public-abi-wrapped-error-negative smoke-optee-trustzone-public-abi-app-hash-negative smoke-optee-trustzone-public-abi-resource-limit-negative smoke-optee-trustzone-public-abi-execute-helloworld smoke-optee-trustzone-public-abi-execute-calcadd smoke-optee-trustzone-public-abi-execute-negaposi smoke-optee-trustzone-attestam-live smoke-optee-trustzone-attestam-verified-acceptance smoke-optee-trustzone-attestam-verified-catalog smoke-optee-trustzone-host-io-resume smoke-optee-trustzone-host-io-resume-negative smoke-optee-trustzone-sha256-boundary-negative smoke-optee-trustzone-teep-agent-hostcall-http smoke-optee-trustzone-teep-agent-hostcall-evidence smoke-optee-trustzone-teep-agent-hostcall-bridge smoke-optee-trustzone-teep-agent-hostcall-object-negative smoke-optee-trustzone-wamr-spike smoke-optee-trustzone-wamr-spike-linked smoke-optee-trustzone-wamr-spike-linked-negative smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative smoke-optee-trustzone-wamr-spike-negatives clean
+.PHONY: fmt build build-optee-trustzone test check-optee-trustzone-smokes e2e e2e-attestam-insecure e2e-attestam-live attestam-remotehello-fixture register-attestam-remotehello-fixture attestam-helloworld-fixture register-attestam-helloworld-fixture attestam-catalog-fixture attestam-catalog-test-fixtures register-attestam-catalog-fixture register-attestam-app-catalog-fixture veraison-generic-eat-corim provision-veraison-generic-eat-fixture smoke-attestam-insecure smoke-attestam-challenge-observe m10-trustzone-checkpoint smoke-optee-trustzone smoke-optee-trustzone-failures smoke-optee-trustzone-abi-vectors smoke-optee-trustzone-execute-abi-negative smoke-optee-trustzone-execute-helloworld smoke-optee-trustzone-execute-calcadd smoke-optee-trustzone-execute-negaposi smoke-optee-trustzone-execute-hostcall-negative smoke-optee-trustzone-execute-cleanup-negative smoke-optee-trustzone-execute-catalog-resource-negative smoke-optee-trustzone-teep-agent-resolve smoke-optee-trustzone-teep-agent-resolve-hash-negative smoke-optee-trustzone-teep-agent-resolve-catalog-negative smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative smoke-optee-trustzone-public-abi-wrapped-error-negative smoke-optee-trustzone-public-abi-app-hash-negative smoke-optee-trustzone-public-abi-resource-limit-negative smoke-optee-trustzone-public-abi-execute-helloworld smoke-optee-trustzone-public-abi-execute-calcadd smoke-optee-trustzone-public-abi-execute-negaposi smoke-optee-trustzone-attestam-live smoke-optee-trustzone-attestam-verified-acceptance smoke-optee-trustzone-attestam-verified-catalog smoke-optee-trustzone-attestam-verified-app smoke-optee-trustzone-host-io-resume smoke-optee-trustzone-host-io-resume-negative smoke-optee-trustzone-sha256-boundary-negative smoke-optee-trustzone-teep-agent-hostcall-http smoke-optee-trustzone-teep-agent-hostcall-evidence smoke-optee-trustzone-teep-agent-hostcall-bridge smoke-optee-trustzone-teep-agent-hostcall-object-negative smoke-optee-trustzone-wamr-spike smoke-optee-trustzone-wamr-spike-linked smoke-optee-trustzone-wamr-spike-linked-negative smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative smoke-optee-trustzone-wamr-spike-negatives clean
 .PHONY: smoke-optee-trustzone-teep-agent-acceptance
 .PHONY: smoke-optee-trustzone-teep-agent-acceptance-faults
 .PHONY: smoke-optee-trustzone-teep-agent-transcript-limits
@@ -99,6 +99,10 @@ attestam-catalog-test-fixtures:
 register-attestam-catalog-fixture:
 	test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make register-attestam-catalog-fixture ATTESTAM_REGISTER_URL=http://localhost:8080/SUITManifestService/RegisterManifest"; exit 2; }
 	$(GO) run ./cmd/twep-attestam-fixture-gen --catalog --out build/attestam/catalog-default.envelope.cbor --sequence 1 --register-url "$(ATTESTAM_REGISTER_URL)"
+
+register-attestam-app-catalog-fixture: build/catalog.dev.cbor
+	test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make register-attestam-app-catalog-fixture ATTESTAM_REGISTER_URL=http://localhost:8080/SUITManifestService/RegisterManifest"; exit 2; }
+	$(GO) run ./cmd/twep-attestam-fixture-gen --catalog --catalog-payload build/catalog.dev.cbor --out build/attestam/catalog-apps.envelope.cbor --sequence 1 --register-url "$(ATTESTAM_REGISTER_URL)"
 
 veraison-generic-eat-corim:
 	mkdir -p build/attestam
@@ -510,6 +514,26 @@ smoke-optee-trustzone-attestam-verified-catalog:
 			--expect-ree 'final-verified=false' \
 			--expect-ree 'TrustZone AttesTAM verified Catalog smoke ok' \
 			--expect-tee 'catalog generation 1 committed'
+
+# OP-TEE academic verified-app path: protect the one requested app, authorize
+# it with the protected Catalog, execute it, and prove restart/offline reuse.
+smoke-optee-trustzone-attestam-verified-app:
+	test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make smoke-optee-trustzone-attestam-verified-app ATTESTAM_REGISTER_URL=http://localhost:8080/SUITManifestService/RegisterManifest VERAISON_PROVISION_URL=https://localhost:9443/endorsement-provisioning/v1/submit"; exit 2; }
+	$(MAKE) provision-veraison-generic-eat-fixture VERAISON_PROVISION_URL="$(VERAISON_PROVISION_URL)"
+	$(MAKE) register-attestam-app-catalog-fixture ATTESTAM_REGISTER_URL="$(ATTESTAM_REGISTER_URL)"
+	$(MAKE) register-attestam-helloworld-fixture ATTESTAM_REGISTER_URL="$(ATTESTAM_REGISTER_URL)"
+	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
+	$(OPTEE_POSTRUN) \
+		--project-path $(CURDIR)/optee/twep-wr-ta \
+		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ATTESTAM_URL="$(ATTESTAM_URL)" ./run_trustzone_smokes.sh attestam-verified-app' \
+		--expect-ree 'Verified Catalog committed' \
+		--expect-ree 'Verified app installed and executed' \
+		--expect-ree 'Protected app restart and offline execution ok' \
+		--expect-ree 'final-verified=false' \
+		--expect-ree 'TrustZone AttesTAM verified app smoke ok' \
+		--expect-tee 'catalog generation 1 committed' \
+		--expect-tee 'app generation 2 committed'
 
 # OP-TEE TA private host I/O resume and TEEP_Agent hostcall broker boundaries.
 smoke-optee-trustzone-host-io-resume:

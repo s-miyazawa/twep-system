@@ -326,6 +326,9 @@ TEE_Result resume_pending_teep_live(const struct bytes_view *request_id,
 		.len = g_pending_teep_live.dev_agent_public_key_len,
 	};
 	uint8_t *teep_output = NULL;
+	uint8_t *protected_app_owned = NULL;
+	uint8_t authorized_app_digest[32] = {};
+	uint8_t protected_app_digest[32] = {};
 	uint8_t execute_output[4096] = {};
 	struct bytes_view teep_result = {};
 	struct bytes_view teep_code = {};
@@ -410,17 +413,22 @@ TEE_Result resume_pending_teep_live(const struct bytes_view *request_id,
 	}
 	if (res != TEE_SUCCESS)
 		goto terminal_failure;
-	if (bytes_view_eq(&resolve_input.resolver_mode, "attestam-verified")) {
-		pending_host_io_clear(&g_pending_host_io);
-		teep_agent_live_session_release();
-		pending_teep_live_clear();
-		TEE_Free(teep_output);
-		return TEE_ERROR_SECURITY;
-	}
 	production_resource_limits_default(&resource_limits);
-	res = parse_teep_resource_limits_output(&teep_result, &resource_limits);
+	res = parse_teep_resource_limits_output(&teep_result, &resource_limits,
+						authorized_app_digest);
 	if (res != TEE_SUCCESS && res != TEE_ERROR_ITEM_NOT_FOUND)
 		goto terminal_failure;
+	if (bytes_view_eq(&resolve_input.resolver_mode, "attestam-verified")) {
+		res = twep_load_protected_app(&app_wasm, &protected_app_owned,
+					      protected_app_digest);
+		if (res != TEE_SUCCESS)
+			goto terminal_failure;
+		if (TEE_MemCompare(authorized_app_digest, protected_app_digest,
+				   32) != 0) {
+			res = TEE_ERROR_SECURITY;
+			goto terminal_failure;
+		}
+	}
 	res = execute_production_app_wasm(&saved_request_id, &saved_command,
 					  &app_input, &app_wasm,
 					  &resource_limits, execute_output,
@@ -437,12 +445,18 @@ TEE_Result resume_pending_teep_live(const struct bytes_view *request_id,
 		pending_teep_live_clear();
 		IMSG("twep-wr-ta production host io resumed and executed app");
 	}
+	if (protected_app_owned) {
+		TEE_Free(protected_app_owned);
+		protected_app_owned = NULL;
+	}
 	if (res != TEE_SUCCESS)
 		goto terminal_failure;
 	TEE_Free(teep_output);
 	return TEE_SUCCESS;
 
 terminal_failure:
+	if (protected_app_owned)
+		TEE_Free(protected_app_owned);
 	pending_host_io_clear(&g_pending_host_io);
 	teep_agent_live_session_release();
 	pending_teep_live_clear();

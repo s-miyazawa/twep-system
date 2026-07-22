@@ -149,6 +149,44 @@ fn live_catalog_commit_uses_exact_payload_and_dedicated_generation_gate() {
 }
 
 #[test]
+fn live_app_commit_uses_exact_verified_payload_and_generation_gate() {
+    let mut state = VerificationState::default();
+    state.mark_cose_outer_verified();
+    state.mark_session_token_bound();
+    state.mark_suit_auth_verified();
+    state.mark_sequence_fresh();
+
+    let component_id = crate::suit::twep_app_component_id(b"remotehello").unwrap();
+    let candidate = attestam_commit_candidate(&component_id, 7, 1);
+    let query_response = b"tagged evidence query response";
+    let platform_status =
+        b"platform-backend=trustzone\nsealed-storage-security=tee-ree-fs-secure-storage\nruntime-location=trustzone-ta\nteep-agent-location=trustzone-ta\n";
+    let mut committed = false;
+    let generation = commit_attestam_app_with(
+        &state,
+        &candidate,
+        query_response,
+        bound_trust_anchor_status(),
+        &bound_agent_identity_status(),
+        platform_status,
+        || Ok(12),
+        |digest, got_component_id, sequence, expected_generation, payload, payload_sha256| {
+            committed = true;
+            assert_eq!(*digest, sha256(query_response));
+            assert_eq!(got_component_id, component_id);
+            assert_eq!(sequence, 7);
+            assert_eq!(expected_generation, 12);
+            assert_eq!(payload, b"payload");
+            assert_eq!(*payload_sha256, [0u8; 32]);
+            Ok(13)
+        },
+    )
+    .expect("app commit generation");
+    assert!(committed);
+    assert_eq!(generation, 13);
+}
+
+#[test]
 fn live_attestam_accepts_bounded_rolling_tokens() {
     assert!(live_attestam_tokens_bound(
         b"query-request-token",

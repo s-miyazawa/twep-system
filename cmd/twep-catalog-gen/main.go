@@ -14,6 +14,7 @@ import (
 
 type appEntry struct {
 	Command         string
+	DisplayName     string
 	ComponentID     string
 	Version         string
 	ABI             string
@@ -53,14 +54,15 @@ func main() {
 
 func catalogApps() ([]appEntry, error) {
 	defs := []struct {
-		command, componentID, version, abi, wasmFile string
-		acceptedFormats                              []string
-		resourceLimits                               map[string]uint64
+		command, displayName, componentID, version, abi, wasmFile string
+		acceptedFormats                                           []string
+		resourceLimits                                            map[string]uint64
 	}{
-		{"helloworld", "twep.example.helloworld", "0.1.0", "twep-app-v1", "helloworld.wasm", nil, nil},
-		{"calcadd", "twep.example.calcadd", "0.1.0", "twep-app-v1", "calcadd.wasm", nil, nil},
+		{"helloworld", "Hello World", "twep.example.helloworld", "0.1.0", "twep-app-v1", "helloworld.wasm", nil, nil},
+		{"calcadd", "Calculator", "twep.example.calcadd", "0.1.0", "twep-app-v1", "calcadd.wasm", nil, nil},
 		{
 			command:         "negaposi",
+			displayName:     "Negative/Positive Image",
 			componentID:     "twep.example.negaposi",
 			version:         "0.1.0",
 			abi:             "twep-app-v1",
@@ -82,6 +84,7 @@ func catalogApps() ([]appEntry, error) {
 		}
 		apps = append(apps, appEntry{
 			Command:         def.command,
+			DisplayName:     def.displayName,
 			ComponentID:     def.componentID,
 			Version:         def.version,
 			ABI:             def.abi,
@@ -96,14 +99,14 @@ func catalogApps() ([]appEntry, error) {
 
 func renderJSON(apps []appEntry) string {
 	var b bytes.Buffer
-	b.WriteString("{\n  \"schema_version\": 1,\n  \"source\": \"local-dev\",\n  \"apps\": {\n")
+	b.WriteString("{\n  \"schema_version\": 1,\n  \"generated_at\": \"2026-07-11T00:00:00Z\",\n  \"source\": \"local-dev\",\n  \"apps\": {\n")
 	for i, app := range apps {
 		comma := ","
 		if i == len(apps)-1 {
 			comma = ""
 		}
-		fmt.Fprintf(&b, "    %q: { \"component_id\": %q, \"version\": %q, \"abi\": %q, \"wasm_file\": %q, \"sha256\": %q",
-			app.Command, app.ComponentID, app.Version, app.ABI, app.WasmFile, hex.EncodeToString(app.SHA256[:]))
+		fmt.Fprintf(&b, "    %q: { \"display_name\": %q, \"component_id\": %q, \"version\": %q, \"abi\": %q, \"wasm_file\": %q, \"sha256\": %q",
+			app.Command, app.DisplayName, app.ComponentID, app.Version, app.ABI, app.WasmFile, hex.EncodeToString(app.SHA256[:]))
 		if len(app.AcceptedFormats) != 0 {
 			fmt.Fprintf(&b, ", \"accepted_formats\": [")
 			for j, format := range app.AcceptedFormats {
@@ -134,6 +137,7 @@ func renderJSON(apps []appEntry) string {
 func renderCBOR(apps []appEntry) ([]byte, error) {
 	root := map[string]any{
 		"schema_version": uint64(1),
+		"generated_at":   "2026-07-11T00:00:00Z",
 		"source":         "local-dev",
 		"apps":           appsMap(apps),
 	}
@@ -150,6 +154,7 @@ func appsMap(apps []appEntry) map[string]any {
 		sha := make([]byte, len(app.SHA256))
 		copy(sha, app.SHA256[:])
 		entry := map[string]any{
+			"display_name": app.DisplayName,
 			"component_id": app.ComponentID,
 			"version":      app.Version,
 			"abi":          app.ABI,

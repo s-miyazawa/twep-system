@@ -110,7 +110,33 @@ pub(crate) fn accept_live_attestam_update_cose(
             }
             #[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
             {
-                Err(b"verified PoC M9.2 rejects app Update candidates")
+                let command = candidate
+                    .info
+                    .app_command
+                    .ok_or(b"verified PoC app component has no command".as_slice())?;
+                let catalog = host_io::read_file_alloc(b"catalog/catalog.cbor", 65_536)
+                    .ok_or(b"verified PoC app requires an active protected Catalog".as_slice())?;
+                if !crate::catalog_validator::validate_authoritative_catalog(&catalog)
+                    || !crate::catalog::authorizes_app_payload(
+                        &catalog,
+                        command,
+                        &candidate.payload_sha256,
+                    )
+                {
+                    return Err(b"verified PoC app is not authorized by the protected Catalog");
+                }
+                let success_payload =
+                    success_response_payload(&candidate.info, candidate.update_token)
+                        .ok_or(b"verified PoC app Success could not be encoded".as_slice())?;
+                if !commit_attestam_app_evidence_result(
+                    &state,
+                    &candidate,
+                    evidence_query_response,
+                    Some(&kid),
+                ) {
+                    return Err(b"verified PoC app failed protected commit/readback gates");
+                }
+                Ok(LiveUpdateAcceptance::AppCommitted { success_payload })
             }
         }
         ComponentKind::Unsupported => Err(b"verified PoC Update component is unsupported"),
@@ -260,6 +286,37 @@ pub(super) fn commit_attestam_catalog_evidence_result(
     .is_some()
 }
 
+#[cfg(not(feature = "m9-1-acceptance-only-smoke"))]
+fn commit_attestam_app_evidence_result(
+    state: &VerificationState,
+    candidate: &TeepUpdateCandidate<'_>,
+    evidence_query_response: &[u8],
+    observed_attestam_kid: Option<&[u8]>,
+) -> bool {
+    let (binding_status, agent_identity_status, platform_status) =
+        attestam_live_acceptance_context(observed_attestam_kid);
+    commit_attestam_app_with(
+        state,
+        candidate,
+        evidence_query_response,
+        binding_status,
+        &agent_identity_status,
+        &platform_status,
+        host_io::acceptance_generation,
+        |digest, component_id, sequence, expected_generation, wasm, wasm_sha256| {
+            host_io::commit_app(
+                digest,
+                component_id,
+                sequence,
+                expected_generation,
+                wasm,
+                wasm_sha256,
+            )
+        },
+    )
+    .is_some()
+}
+
 pub(super) fn attestam_acceptance_commit_ready(
     state: &VerificationState,
     candidate: &TeepUpdateCandidate<'_>,
@@ -373,6 +430,53 @@ where
     let expected_generation = current_generation().ok()?;
     let required_generation = expected_generation.checked_add(1)?;
     let new_generation = commit_catalog(
+        &digest,
+        component_id,
+        sequence,
+        expected_generation,
+        candidate.info.payload,
+        &candidate.payload_sha256,
+    )
+    .ok()?;
+    if new_generation != required_generation {
+        return None;
+    }
+    Some(new_generation)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[cfg(any(not(feature = "m9-1-acceptance-only-smoke"), test))]
+pub(super) fn commit_attestam_app_with<F, G>(
+    state: &VerificationState,
+    candidate: &TeepUpdateCandidate<'_>,
+    evidence_query_response: &[u8],
+    binding_status: credential_management::TrustAnchorBindingStatus,
+    agent_identity_status: &AgentIdentityStatus,
+    platform_status: &[u8],
+    current_generation: F,
+    commit_app: G,
+) -> Option<u64>
+where
+    F: FnOnce() -> Result<u64, i32>,
+    G: FnOnce(&[u8; 32], &[u8], u64, u64, &[u8], &[u8; 32]) -> Result<u64, i32>,
+{
+    if candidate.info.component_kind != ComponentKind::App
+        || candidate.info.app_command.is_none()
+        || candidate.info.payload.is_empty()
+    {
+        return None;
+    }
+    let (digest, component_id, sequence) = attestam_acceptance_commit_input(
+        state,
+        candidate,
+        evidence_query_response,
+        binding_status,
+        agent_identity_status,
+        platform_status,
+    )?;
+    let expected_generation = current_generation().ok()?;
+    let required_generation = expected_generation.checked_add(1)?;
+    let new_generation = commit_app(
         &digest,
         component_id,
         sequence,
