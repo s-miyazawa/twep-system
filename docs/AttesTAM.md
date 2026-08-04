@@ -52,14 +52,18 @@ reproduce tests without a private key service.
 | TEEP Agent QueryResponse and Success signing fixture | `internal/demokeys/keys.go` and `wasm/teep-agent/src/cose.rs` |
 | Alternate development TEEP Agent signer | `internal/teepbroker/teepbroker.go` and `wasm/teep-agent/src/cose.rs` |
 | SUIT/TC signing fixture | `internal/demokeys/keys.go` |
-| Generic EAT Evidence signing fixture | `internal/demokeys/keys.go` |
+| Generic EAT Evidence signing fixture | `wasm/teep-agent/src/cose.rs` |
 | Wasm application and TEEP Agent code signing | `internal/demokeys/keys.go` |
 
 The fixture generator writes only the required public verification keys into
 the development protected credential store. TEEP-message and SUIT verification
-use distinct entries and purposes. Generic EAT uses ES256; the development
-TEEP/SUIT messages use the algorithms selected by their existing fixture
-profiles.
+use distinct entries and purposes. Generic EAT uses ES256; its fixed
+development private key and signing operation are embedded in the Rust
+TEEP_Agent Wasm and remain separate from the TEEP message ESP256 signer. The
+key is publicly recoverable and forgeable, not a hardware-protected or
+production credential, so successful verification still requires
+`final-verified=false`. The development TEEP/SUIT messages use the algorithms
+selected by their existing fixture profiles.
 
 ## Required software
 

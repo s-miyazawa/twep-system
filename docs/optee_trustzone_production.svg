@@ -54,7 +54,7 @@
   <text x="300" y="840" class="body center">opaque update and app bytes</text><text x="300" y="871" class="body center">Catalog candidate transport</text>
   <rect x="550" y="760" width="400" height="137" rx="13" class="card whiteCard"/>
   <text x="750" y="805" class="boxTitle center">host I/O callbacks</text>
-  <text x="750" y="840" class="body center">HTTP/TLS transport</text><text x="750" y="871" class="body center">Evidence broker</text>
+  <text x="750" y="840" class="body center">HTTP/TLS transport</text><text x="750" y="871" class="body center">buffer transport</text>
   <path d="M397 632V710H300V750" class="dashed grayLine"/>
   <path d="M397 710H750V750" class="dashed grayLine"/>
   <text x="520" y="688" class="small center">REE transports opaque bytes</text>
@@ -81,7 +81,7 @@
 
   <rect x="1230" y="850" width="335" height="145" rx="14" class="card whiteCard"/>
   <text x="1397" y="895" class="boxTitle center">host I/O requests</text>
-  <text x="1397" y="930" class="body center">read/write state object</text><text x="1397" y="963" class="body center">http_post / create_evidence</text>
+  <text x="1397" y="930" class="body center">read/write state object</text><text x="1397" y="963" class="body center">http_post / create_evidence (diag)</text>
   <rect x="1710" y="850" width="350" height="145" rx="14" class="card coralCard"/>
   <text x="1885" y="895" class="boxTitle center">Continuation state</text>
   <text x="1885" y="930" class="body center">request_id, io_id</text><text x="1885" y="963" class="body center">transcript binding</text>

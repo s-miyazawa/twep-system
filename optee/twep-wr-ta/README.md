@@ -154,8 +154,10 @@ The production TrustZone path uses CBOR envelope v1:
   existing `twep_wr_execute` response schema, or `need_host_io`.
 
 `need_host_io` is intentionally narrow. The settled ABI also permits
-`read_state_object` and `write_state_object`, but the current TA emits only
-`http_post` and `create_evidence` in `need_host_io` responses. TEEP_Agent
+`read_state_object`, `write_state_object`, and `create_evidence`, but normal
+TEEP sessions emit only `http_post` in `need_host_io` responses. The
+`create_evidence` continuation remains for explicit ABI diagnostic probes.
+TEEP_Agent
 object reads and writes that stay inside the TA use synchronous
 `twep_host_read_file` / `twep_host_write_file` natives over TA-managed object
 names; they do not round-trip through REE resume. `twep_host_read_protected` is
@@ -165,9 +167,9 @@ Storage. Generic TEEP_Agent writes to
 Storage PUT command also rejects `verified-evidence-result.cbor`, the logical
 `teep-acceptance-state.cbor` name, and both TA-internal physical slot names.
 Only the dedicated D043 acceptance commit updates the slots and persists the
-positive-result object for the final-capable reader. REE code carries bytes,
-performs HTTP transport, and brokers
-Evidence bytes; it does not make Catalog trust decisions.
+positive-result object for the final-capable reader. REE code carries bytes
+and performs HTTP transport; the Rust TEEP_Agent creates Generic EAT Evidence
+internally. The REE does not make Catalog trust decisions.
 
 Host I/O continuation follows Decision D027. The production path does not keep
 a live WAMR call frame across an REE roundtrip. Instead, the TA stores

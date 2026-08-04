@@ -63,7 +63,7 @@ All TEEP Agent hostcalls are declared in the `twep_teep_env` import module.
 | `twep_host_write_file` | `write_file` | Write diagnostic, staging, and installed payload files |
 | `twep_host_read_protected` | `read_protected*` | Read credential, freshness, and platform-identity objects |
 | `twep_host_http_post` | `http_post` | AttesTAM session |
-| `twep_host_create_evidence` | `create_evidence` | Create EAT evidence for a challenge response |
+| `twep_host_create_evidence` | `create_evidence` | Legacy ABI diagnostic; normal challenge responses generate Generic EAT internally |
 | `twep_host_platform_status` | `platform_status` | Diagnose backend state |
 | `twep_host_teep_agent_measurement_sha256` | `teep_agent_measurement_sha256` | Measurement of the loaded TEEP Agent Wasm |
 | `twep_host_random` | `random` | Probe / session helper |

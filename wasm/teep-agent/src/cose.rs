@@ -41,6 +41,18 @@ const DEMO_AGENT_PRIVATE_KEY_D: [u8; 32] = [
     0xa1, 0x3d, 0x1c, 0x9f, 0x42, 0x78, 0x04, 0x70, 0x82, 0xc4, 0xa4, 0x06, 0xef, 0x33, 0xa9, 0xae,
     0xd2, 0xda, 0x01, 0x05, 0x87, 0xa3, 0x75, 0x1e, 0xab, 0xaa, 0x0b, 0x6b, 0xa0, 0x12, 0x63, 0xe3,
 ];
+const DEMO_EVIDENCE_PUBLIC_KEY_X: [u8; 32] = [
+    0x30, 0xa0, 0x42, 0x4c, 0xd2, 0x1c, 0x29, 0x44, 0x83, 0x8a, 0x2d, 0x75, 0xc9, 0x2b, 0x37, 0xe7,
+    0x6e, 0xa2, 0x0d, 0x9f, 0x00, 0x89, 0x3a, 0x3b, 0x4e, 0xee, 0x8a, 0x3c, 0x0a, 0xaf, 0xec, 0x3e,
+];
+const DEMO_EVIDENCE_PUBLIC_KEY_Y: [u8; 32] = [
+    0xe0, 0x4b, 0x65, 0xe9, 0x24, 0x56, 0xd9, 0x88, 0x8b, 0x52, 0xb3, 0x79, 0xbd, 0xfb, 0xd5, 0x1e,
+    0xe8, 0x69, 0xef, 0x1f, 0x0f, 0xc6, 0x5b, 0x66, 0x59, 0x69, 0x5b, 0x6c, 0xce, 0x08, 0x17, 0x23,
+];
+const DEMO_EVIDENCE_PRIVATE_KEY_D: [u8; 32] = [
+    0xf3, 0xbd, 0x0c, 0x07, 0xa8, 0x1f, 0xb9, 0x32, 0x78, 0x1e, 0xd5, 0x27, 0x52, 0xf6, 0x0c, 0xc8,
+    0x9a, 0x6b, 0xe5, 0xe5, 0x19, 0x34, 0xfe, 0x01, 0x93, 0x8d, 0xdb, 0x55, 0xd8, 0xf7, 0x78, 0x01,
+];
 
 #[cfg(test)]
 fn cose_sign1_payload(input: &[u8]) -> Option<&[u8]> {
@@ -232,6 +244,31 @@ pub(crate) fn sign_demo_agent_esp256_cose_sign1(
         SigningKey::from_slice(&private_key).map_err(|_| CoseSign1SigningError::KeyRejected)?;
     let protected = HeaderBuilder::new()
         .algorithm(iana::Algorithm::ESP256)
+        .build();
+    let unprotected = HeaderBuilder::new().key_id(kid.to_vec()).build();
+    let sign1 = CoseSign1Builder::new()
+        .protected(protected)
+        .unprotected(unprotected)
+        .payload(payload.to_vec())
+        .try_create_signature(&[], |tbs| {
+            let signature: Signature = signing_key.sign(tbs);
+            Ok::<_, CoseSign1SigningError>(signature.to_bytes().to_vec())
+        })
+        .map_err(|_| CoseSign1SigningError::KeyRejected)?
+        .build();
+    sign1
+        .to_tagged_vec()
+        .map_err(|_| CoseSign1SigningError::EncodeFailed)
+}
+
+pub(crate) fn sign_demo_evidence_es256_cose_sign1(
+    payload: &[u8],
+) -> Result<Vec<u8>, CoseSign1SigningError> {
+    let kid = cose_key_thumbprint(DEMO_EVIDENCE_PUBLIC_KEY_X, DEMO_EVIDENCE_PUBLIC_KEY_Y)?;
+    let signing_key = SigningKey::from_slice(&DEMO_EVIDENCE_PRIVATE_KEY_D)
+        .map_err(|_| CoseSign1SigningError::KeyRejected)?;
+    let protected = HeaderBuilder::new()
+        .algorithm(iana::Algorithm::ES256)
         .build();
     let unprotected = HeaderBuilder::new().key_id(kid.to_vec()).build();
     let sign1 = CoseSign1Builder::new()
@@ -529,6 +566,55 @@ mod tests {
                 }
             })
             .expect("signature verified with alternate key");
+    }
+
+    #[test]
+    fn sign_demo_evidence_cose_sign1_uses_fixed_es256_key_and_rejects_tampering() {
+        let payload = b"\xa1\x0a\x48\x31\x32\x33\x34\x35\x36\x37\x38";
+        let signed =
+            sign_demo_evidence_es256_cose_sign1(payload).expect("signed Generic EAT Evidence");
+        let mut sign1 = CoseSign1::from_tagged_slice(&signed).expect("tagged COSE_Sign1");
+
+        assert_eq!(sign1.payload.as_deref(), Some(payload.as_slice()));
+        assert_eq!(
+            sign1.protected.header.alg,
+            Some(Algorithm::Assigned(iana::Algorithm::ES256))
+        );
+        assert_eq!(
+            sign1.unprotected.key_id,
+            cose_key_thumbprint(DEMO_EVIDENCE_PUBLIC_KEY_X, DEMO_EVIDENCE_PUBLIC_KEY_Y)
+                .expect("Evidence key thumbprint")
+        );
+        sign1
+            .verify_signature(&[], |signature, tbs| {
+                if verify_with_key(
+                    DEMO_EVIDENCE_PUBLIC_KEY_X,
+                    DEMO_EVIDENCE_PUBLIC_KEY_Y,
+                    signature,
+                    tbs,
+                ) {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            })
+            .expect("signature verified with fixed Evidence key");
+
+        sign1.signature[0] ^= 1;
+        assert!(sign1
+            .verify_signature(&[], |signature, tbs| {
+                if verify_with_key(
+                    DEMO_EVIDENCE_PUBLIC_KEY_X,
+                    DEMO_EVIDENCE_PUBLIC_KEY_Y,
+                    signature,
+                    tbs,
+                ) {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            })
+            .is_err());
     }
 
     #[test]

@@ -20,22 +20,8 @@ extern int32_t twepwrHTTPPostCallback(
 	size_t buf_cap,
 	size_t *out_len);
 
-extern int32_t twepwrCreateEvidenceCallback(
-	void *user_data,
-	uint8_t *challenge,
-	size_t challenge_len,
-	uint8_t *agent_public_key_cose,
-	size_t agent_public_key_cose_len,
-	uint8_t *buf,
-	size_t buf_cap,
-	size_t *out_len);
-
 static inline twep_wr_http_post_fn twepwr_http_post_callback(void) {
 	return (twep_wr_http_post_fn)twepwrHTTPPostCallback;
-}
-
-static inline twep_wr_create_evidence_fn twepwr_create_evidence_callback(void) {
-	return (twep_wr_create_evidence_fn)twepwrCreateEvidenceCallback;
 }
 
 static inline void *twepwr_hostio_user_data(uintptr_t v) {
@@ -157,9 +143,8 @@ func InitWithConfig(config Config) (*Context, error) {
 	}
 	ctx.hostHandle = cgo.NewHandle(ctx)
 	hostIO := C.twep_wr_host_io_t{
-		http_post:       C.twepwr_http_post_callback(),
-		create_evidence: C.twepwr_create_evidence_callback(),
-		user_data:       C.twepwr_hostio_user_data(C.uintptr_t(ctx.hostHandle)),
+		http_post: C.twepwr_http_post_callback(),
+		user_data: C.twepwr_hostio_user_data(C.uintptr_t(ctx.hostHandle)),
 	}
 	st = C.twep_wr_set_host_io(ctx.ptr, &hostIO)
 	if st != C.TWEP_WR_OK {
@@ -293,36 +278,6 @@ func twepwrHTTPPostCallback(userData unsafe.Pointer, urlPtr *C.uint8_t, urlLen C
 	}
 	if len(response) != 0 && buf != nil {
 		C.memcpy(unsafe.Pointer(buf), unsafe.Pointer(&response[0]), C.size_t(len(response)))
-	}
-	return 0
-}
-
-//export twepwrCreateEvidenceCallback
-func twepwrCreateEvidenceCallback(userData unsafe.Pointer, challengePtr *C.uint8_t, challengeLen C.size_t, agentPublicKeyPtr *C.uint8_t, agentPublicKeyLen C.size_t, buf *C.uint8_t, bufCap C.size_t, outLen *C.size_t) C.int32_t {
-	if userData == nil || outLen == nil || (challengePtr == nil && challengeLen != 0) || (agentPublicKeyPtr == nil && agentPublicKeyLen != 0) {
-		return 1
-	}
-	*outLen = 0
-	handle := cgo.Handle(uintptr(userData))
-	ctx, ok := handle.Value().(*Context)
-	if !ok || ctx == nil {
-		return 1
-	}
-	if !ctx.config.allowsDevelopmentAttesTAMCallbacks() {
-		return 4
-	}
-	challenge := C.GoBytes(unsafe.Pointer(challengePtr), C.int(challengeLen))
-	agentPublicKey := C.GoBytes(unsafe.Pointer(agentPublicKeyPtr), C.int(agentPublicKeyLen))
-	evidence, err := teepbroker.SignDemoAgentEvidence(challenge, agentPublicKey, teepbroker.DemoAttesterKeyCBOR())
-	if err != nil {
-		return 7
-	}
-	*outLen = C.size_t(len(evidence))
-	if C.size_t(len(evidence)) > bufCap {
-		return 2
-	}
-	if len(evidence) != 0 && buf != nil {
-		C.memcpy(unsafe.Pointer(buf), unsafe.Pointer(&evidence[0]), C.size_t(len(evidence)))
 	}
 	return 0
 }

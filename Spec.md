@@ -14,8 +14,8 @@ The platform has two primary backends: plain Linux (Ubuntu 24.04) and TrustZone 
 | Verified provisioning | Require TEEP/COSE/SUIT verification against a real AttesTAM instance |
 | Trusted Wasm App ABI | Adopt a custom CBOR input/CBOR output ABI. `docs/ABI.md` is authoritative for details |
 | ABI evolution | Maintain schema versioning so that a later ABI revision can be defined using an Interface Definition Language |
-| Wasm binary portability | The TEEP_Agent Wasm Application and general Trusted Wasm Applications must run as the same Wasm binary across different platform backends such as Linux, TrustZone, SGX, and Keystone. Platform differences are absorbed by hostcall implementations, protected storage, Evidence generation, and runtime policy; platform-specific Wasm artifacts are not created |
-| TEEP_Agent hostcalls | Provide file/http/evidence/read-protected/random/time/log exclusively for the TEEP_Agent. COSE_Sign1 generation for TEEP messages is performed within the Rust TEEP_Agent |
+| Wasm binary portability | The TEEP_Agent Wasm Application and general Trusted Wasm Applications must run as the same Wasm binary across different platform backends such as Linux, TrustZone, SGX, and Keystone. Platform differences are absorbed by hostcall implementations, protected storage, and runtime policy; platform-specific Wasm artifacts are not created |
+| TEEP_Agent hostcalls | Provide file/http/evidence/read-protected/random/time/log exclusively for the TEEP_Agent. COSE_Sign1 generation for TEEP messages and the current Generic EAT Evidence is performed within the Rust TEEP_Agent; the Evidence hostcall remains for ABI and diagnostic compatibility |
 | NegaPosi | Support JPEG only. Formats other than JPEG will be handled by a future `negaposi.wasm` update |
 | twepd | Run as a user service in the REE for both primary backends |
 
@@ -97,7 +97,7 @@ $ twep-cli negaposi -i image.jpg -o output.jpg
 
 - Communicates with AttesTAM using TEEP to acquire, update, and install the Catalog File and Trusted Wasm Apps.
 - The TEEP_Agent itself is the root-side component that verifies the Catalog File and Trusted Wasm Apps. Initial final verified mode does not support self-update through AttesTAM; measurement or pinning is delegated to the platform root of trust.
-- The Generic EAT format is authoritative for Evidence, and the implementation integrates with the Veraison Generic EAT verifier. Hardware-specific evidence/key binding, such as SGX DCAP quotes, OP-TEE hardware unique keys, and RPMB-derived freshness, is outside the repository's verified protocol profile.
+- The Generic EAT format is authoritative for Evidence, and the implementation integrates with the Veraison Generic EAT verifier. The Rust TEEP_Agent generates it with a separate fixed ES256 development key embedded in the Wasm binary. That private key is public and forgeable, so it is not a hardware-protected or production credential and cannot establish `final-verified=true`. Hardware-specific evidence/key binding, such as SGX DCAP quotes, OP-TEE hardware unique keys, and RPMB-derived freshness, is outside the repository's verified protocol profile.
 - Reads and writes the Catalog File stored in a special directory on the Local File System.
 - Resolves a Trusted Wasm App from a command name.
 - Verifies a Wasm app's hash, version, and component ID as necessary.
@@ -349,7 +349,7 @@ twep-cli-response = {
 - Generates Evidence for AttesTAM challenge-response.
 - Treats AttesTAM as the Relying Party for Veraison. TEEP Agent does not receive or verify Veraison Attestation Results.
 - Verifies the TAM trust anchor, TAM-signed Update, acceptance-generation freshness, and agent key binding.
-- Uses development Evidence on plain Linux and TA-mediated Evidence handling on TrustZone.
+- Uses the same TEEP Agent-generated development Evidence on plain Linux and TrustZone. Normal sessions do not delegate Evidence signing to the REE.
 
 ## Acceptance Criteria
 

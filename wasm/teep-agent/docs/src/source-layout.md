@@ -58,7 +58,7 @@ wasm/teep-agent/
 | `credential_management.rs` | Parsing credential/policy state and diagnosing trust-anchor binding |
 | `protected_credentials.rs` | Detailed validation of the protected credential-store schema |
 | `freshness.rs` | CBOR processing for reading and writing the sequence-freshness map |
-| `evidence.rs` | QueryRequest challenge extraction, EAT evidence hostcall integration, evidence-result CBOR |
+| `evidence.rs` | QueryRequest challenge extraction, Generic EAT construction, fixed development ES256 signing, evidence-result CBOR |
 | `cbor.rs` | Small no_std CBOR reader/writer |
 
 ## Function Layout
@@ -90,7 +90,7 @@ If `resolver_mode` is `attestam-verified`, it enters
 | `write_file` | `twep_host_write_file` | Request atomic writes in the state directory |
 | `read_protected_len` / `read_protected` / `read_protected_alloc` | `twep_host_read_protected` | Read by protected object name |
 | `http_post` | `twep_host_http_post` | POST to the configured AttesTAM URL |
-| `create_evidence` | `twep_host_create_evidence` | Create EAT evidence from a challenge and agent public key |
+| `create_evidence` | `twep_host_create_evidence` | Legacy ABI diagnostic; normal Generic EAT generation does not call it |
 | `platform_status` | `twep_host_platform_status` | Observe backend state |
 | `teep_agent_measurement_sha256` | `twep_host_teep_agent_measurement_sha256` | Get the measurement of the loaded Wasm |
 | `random` | `twep_host_random` | Random bytes for nonce/probe |

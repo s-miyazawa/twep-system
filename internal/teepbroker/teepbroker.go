@@ -4,8 +4,6 @@ package teepbroker
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,10 +76,6 @@ func DemoTrustedAgentKeyCBOR() []byte {
 	return demokeys.DemoTrustedAgentESP256PrivateCOSEKey()
 }
 
-func DemoAttesterKeyCBOR() []byte {
-	return demokeys.DemoAttesterES256PrivateCOSEKey()
-}
-
 func AlternateDemoAgentKeyCBOR() []byte {
 	return clone(alternateDemoAgentKeyCBOR)
 }
@@ -113,87 +107,6 @@ func PublicCOSEKeyCBOR(privateKeyCBOR []byte) ([]byte, error) {
 	}
 	publicCOSEKey.Algorithm = alg
 	return publicCOSEKey.MarshalCBOR()
-}
-
-func SignDemoAgentEvidence(challenge []byte, agentPublicKeyCOSE []byte, keyCBOR []byte) ([]byte, error) {
-	if len(challenge) == 0 {
-		return nil, fmt.Errorf("challenge is empty")
-	}
-	var agentPublicKey any
-	if err := cbor.Unmarshal(agentPublicKeyCOSE, &agentPublicKey); err != nil {
-		return nil, fmt.Errorf("decode agent public COSE key: %w", err)
-	}
-	measuredComponent, err := cbor.Marshal(map[uint64]any{
-		1: []any{"TEEP Agent", []any{"1.3.4", uint64(1)}},
-		2: []any{uint64(1), demoAgentEATMeasurementDigest},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode mock EAT measured component: %w", err)
-	}
-	eatPayload, err := cbor.Marshal(map[uint64]any{
-		10:  challenge,
-		256: demoAgentEATUEID,
-		265: "urn:ietf:rfc:rfc9711",
-		273: []any{
-			[]any{
-				uint64(600),
-				measuredComponent,
-			},
-		},
-		8: map[uint64]any{
-			1: agentPublicKey,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode mock EAT evidence: %w", err)
-	}
-	alg := cose.AlgorithmES256
-	return signDemoAgentCOSESign1WithAlgorithm(eatPayload, keyCBOR, &alg)
-}
-
-func signDemoAgentCOSESign1WithAlgorithm(payload []byte, keyCBOR []byte, forceAlg *cose.Algorithm) ([]byte, error) {
-	var key cose.Key
-	if err := cbor.Unmarshal(keyCBOR, &key); err != nil {
-		return nil, fmt.Errorf("decode demo trusted agent key: %w", err)
-	}
-	alg, err := key.AlgorithmOrDefault()
-	if err != nil {
-		return nil, fmt.Errorf("detect demo signing algorithm: %w", err)
-	}
-	var signer cose.Signer
-	if forceAlg == nil {
-		signer, err = key.Signer()
-		if err != nil {
-			return nil, fmt.Errorf("create demo signer: %w", err)
-		}
-	} else {
-		alg = *forceAlg
-		privateKey, err := key.PrivateKey()
-		if err != nil {
-			return nil, fmt.Errorf("load demo signing key: %w", err)
-		}
-		cryptoSigner, ok := privateKey.(crypto.Signer)
-		if !ok {
-			return nil, fmt.Errorf("demo signing key is not crypto.Signer")
-		}
-		signer, err = cose.NewSigner(alg, cryptoSigner)
-		if err != nil {
-			return nil, fmt.Errorf("create demo signer for %s: %w", alg, err)
-		}
-	}
-	kid, err := key.Thumbprint(crypto.SHA256)
-	if err != nil {
-		return nil, fmt.Errorf("derive demo signing kid: %w", err)
-	}
-	headers := cose.Headers{
-		Protected: cose.ProtectedHeader{
-			cose.HeaderLabelAlgorithm: alg,
-		},
-		Unprotected: cose.UnprotectedHeader{
-			cose.HeaderLabelKeyID: kid,
-		},
-	}
-	return cose.Sign1(rand.Reader, signer, headers, payload, nil)
 }
 
 func clone(in []byte) []byte {

@@ -47,7 +47,7 @@ flowchart LR
         publicabi["twep_wr_public_abi_smoke\nhost/public_abi_smoke.c"]
         teec["libteec / TEEC transport"]
         state["guest state/cache bytes\ncatalog, apps, teep-agent artifacts"]
-        http["HTTP / Evidence broker bytes\nhost I/O only"]
+        http["HTTP/TLS and buffer transport\nhost I/O only"]
     end
 
     subgraph secure["Secure World / OP-TEE TA"]
@@ -247,7 +247,7 @@ flowchart TB
         needio["build_need_host_io_response()\nbuild_need_evidence_response()"]
         resume["resume_pending_teep_live()\nbuild_resume_final_response()"]
         teepresolve["execute_teep_agent_resolve()"]
-        teepnative["twep_teep_env natives\nread_file/write_file\nread_protected\nhttp_post/create_evidence\nplatform_status/random/time/log"]
+        teepnative["twep_teep_env natives\nread_file/write_file\nread_protected\nhttp_post/create_evidence (diagnostic)\nplatform_status/random/time/log"]
         appw["TA-local app WAMR path\nensure_wamr_runtime()\nwasm_has_import_section()\ntwep_app_abi_version()\ntwep_app_main()\ntwep_app_free()"]
         appresponse["extract_stdout_view()\nbuild_execute_response()\nbuild_final_response_wrapper()"]
     end

@@ -14,10 +14,8 @@ const DEMO_AGENT_PUBLIC_COSE_KEY: &[u8] = &[
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BuildQueryResponseError {
-    AttestationUnsupported,
     MissingToken,
     EncodeFailed,
-    PendingHostIo,
 }
 
 pub(super) struct SignedQueryResponse {
@@ -44,7 +42,6 @@ pub(super) fn sign_query_response(
         &mut evidence_buf,
     ) {
         Ok(value) => value,
-        Err(BuildQueryResponseError::PendingHostIo) => return Err(127),
         Err(err) => {
             return Err(write_output(
                 out_desc_ptr,
@@ -79,27 +76,8 @@ fn build_query_response_payload(
             let challenge = evidence::query_request_challenge(query_request_payload)
                 .ok_or(BuildQueryResponseError::EncodeFailed)?;
             let agent_public_key = demo_agent_public_key(agent_public_key_buf);
-            let evidence = evidence::create_eat_evidence(
-                challenge,
-                agent_public_key,
-                evidence_buf,
-                |challenge, agent_public_key, out| match host_io::create_evidence(
-                    challenge,
-                    agent_public_key,
-                    out,
-                ) {
-                    Ok(len) => Ok(len),
-                    Err((11, _)) => Err(evidence::EvidenceError::Internal),
-                    Err((status, len)) => Err(evidence::host_status_to_evidence_error(status, len)),
-                },
-            )
-            .map_err(|err| match err {
-                evidence::EvidenceError::Internal => BuildQueryResponseError::PendingHostIo,
-                evidence::EvidenceError::Unsupported => {
-                    BuildQueryResponseError::AttestationUnsupported
-                }
-                _ => BuildQueryResponseError::EncodeFailed,
-            })?;
+            let evidence = evidence::create_eat_evidence(challenge, agent_public_key, evidence_buf)
+                .map_err(|_| BuildQueryResponseError::EncodeFailed)?;
             let payload = query_response_payload_with_attestation(requested_component_id, evidence)
                 .map_err(|_| BuildQueryResponseError::EncodeFailed)?;
             Ok(QueryResponsePayload {
@@ -114,10 +92,6 @@ fn build_query_response_payload(
 
 fn build_query_response_error_output(err: BuildQueryResponseError) -> Vec<u8> {
     match err {
-        BuildQueryResponseError::AttestationUnsupported => error_output(
-            b"teep.attestation_unsupported",
-            b"AttesTAM QueryRequest attestation challenge is not supported",
-        ),
         BuildQueryResponseError::MissingToken => error_output(
             b"teep.protocol",
             b"AttesTAM QueryRequest token is not available",
@@ -126,9 +100,6 @@ fn build_query_response_error_output(err: BuildQueryResponseError) -> Vec<u8> {
             b"teep.protocol",
             b"AttesTAM QueryResponse payload encoding failed",
         ),
-        BuildQueryResponseError::PendingHostIo => {
-            error_output(b"teep.protocol", b"AttesTAM QueryResponse host I/O pending")
-        }
     }
 }
 

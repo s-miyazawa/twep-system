@@ -17,7 +17,6 @@ func TestDemoCOSEKeysUseExpectedAlgorithms(t *testing.T) {
 	}{
 		{name: "tam", key: DemoTAMESP256PrivateCOSEKey(), want: cose.AlgorithmESP256},
 		{name: "trusted-agent", key: DemoTrustedAgentESP256PrivateCOSEKey(), want: cose.AlgorithmESP256},
-		{name: "attester", key: DemoAttesterES256PrivateCOSEKey(), want: cose.AlgorithmES256},
 		{name: "teep-agent-code-signing", key: DemoTEEPAgentCodeSigningESP256PrivateCOSEKey(), want: cose.AlgorithmESP256},
 		{name: "app-code-signing", key: DemoAppCodeSigningESP256PrivateCOSEKey(), want: cose.AlgorithmESP256},
 	}

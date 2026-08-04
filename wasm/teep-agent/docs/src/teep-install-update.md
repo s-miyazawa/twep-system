@@ -61,7 +61,8 @@ If the QueryRequest has an attestation challenge:
 
 1. `evidence::query_request_challenge` reads the challenge.
 2. `session::demo_agent_public_key` chooses the agent public COSE_Key.
-3. `evidence::create_eat_evidence` calls `host_io::create_evidence`.
+3. `evidence::create_eat_evidence` constructs the Generic EAT and signs it with
+   the fixed development ES256 Evidence key inside the Rust TEEP_Agent.
 4. `teep::query_response_payload_with_attestation` builds the payload with evidence.
 5. The payload is signed with the development agent key.
 
