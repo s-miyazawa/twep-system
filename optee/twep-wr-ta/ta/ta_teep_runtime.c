@@ -68,6 +68,11 @@ TEE_Result execute_teep_agent_resolve(
 		     res);
 		return res;
 	}
+	res = twep_ta_verify_teep_agent_wasm_signature(wasm);
+	if (res != TEE_SUCCESS) {
+		EMSG("twep-wr-ta teep-agent code signature rejected");
+		return TEE_ERROR_SECURITY;
+	}
 	host_ctx.resolver_mode = resolve_input.resolver_mode;
 	if (dev_agent_public_key && dev_agent_public_key->len) {
 		res = teep_transient_object_write(
@@ -81,8 +86,6 @@ TEE_Result execute_teep_agent_resolve(
 	host_ctx.command = resolve_input.command;
 	verified_acceptance = bytes_view_eq(&resolve_input.resolver_mode,
 					    "attestam-verified");
-	if (!wasm_magic_valid(wasm))
-		return TEE_ERROR_BAD_FORMAT;
 	if (bytes_view_eq(&resolve_input.command, "resolve_app")) {
 		if (verified_acceptance) {
 			if (catalog->len || app_wasm->len)

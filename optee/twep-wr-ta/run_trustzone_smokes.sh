@@ -8,7 +8,7 @@ PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=optee_example_twep_wr_ta
 
 usage() {
-	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|attestam-verified-app|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
+	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-signature-negative|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|attestam-verified-app|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
 }
 
 reset_guest_secure_storage() {
@@ -136,6 +136,14 @@ run_teep_agent_resolve() {
 	grep -q "TA production teep-agent resolve executed ok" "/tmp/twep-trustzone-teep-agent-resolve.log"
 	cat "/tmp/twep-trustzone-teep-agent-resolve.log"
 	echo "TrustZone TA teep-agent resolve executed ok"
+}
+
+run_teep_agent_signature_negative() {
+	"${APP}" teep-agent-signature-negative "${PROJECT_DIR}/guest/build/teep-agent.wasm" "${PROJECT_DIR}/guest/build/catalog.dev.cbor" "${PROJECT_DIR}/guest/build/helloworld.wasm" >"/tmp/twep-trustzone-teep-agent-signature-negative.log"
+	grep -q "TA production rejected tampered teep-agent signature ok" "/tmp/twep-trustzone-teep-agent-signature-negative.log"
+	grep -q "TA production rejected app-role wasm as teep-agent ok" "/tmp/twep-trustzone-teep-agent-signature-negative.log"
+	cat "/tmp/twep-trustzone-teep-agent-signature-negative.log"
+	echo "TrustZone TA teep-agent signature negative ok"
 }
 
 run_teep_agent_resolve_hash_negative() {
@@ -875,6 +883,9 @@ execute-catalog-resource-negative)
 	;;
 teep-agent-resolve)
 	run_teep_agent_resolve
+	;;
+teep-agent-signature-negative)
+	run_teep_agent_signature_negative
 	;;
 teep-agent-resolve-hash-negative)
 	run_teep_agent_resolve_hash_negative

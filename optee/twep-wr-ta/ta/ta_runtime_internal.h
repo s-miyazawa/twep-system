@@ -264,6 +264,8 @@ TWEP_TA_HIDDEN TEE_Result execute_teep_agent_resolve(
 	enum teep_agent_pending_hostcall replay, const uint8_t *replay_payload,
 	size_t replay_payload_len, uint8_t *out, size_t out_size,
 	size_t *out_len);
+TWEP_TA_HIDDEN TEE_Result twep_ta_verify_teep_agent_wasm_signature(
+	const struct bytes_view *wasm);
 TWEP_TA_HIDDEN TEE_Result twep_load_protected_app(struct bytes_view *app,
 						  uint8_t **owned,
 						  uint8_t digest[32]);

@@ -106,10 +106,12 @@ When `app_input` is specified in the top-level request, the host treats those by
 ## Wasm code-signing package format
 
 Every executable Wasm module loaded by the plain Linux backend carries a final
-custom section named `twep.sig`. WAMR ignores the section at execution time, but
-`twep-wr` verifies it before loading the module. The signature binds the exact
-Wasm bytes before the `twep.sig` section; catalog hashes and SUIT payload
-digests are computed over the complete signed Wasm file.
+custom section named `twep.sig`. The TrustZone backend requires the same section
+on the privileged TEEP_Agent Wasm. WAMR ignores the section at execution time,
+but the Linux `twep-wr` or the TrustZone TA verifies it before loading the
+module. The signature binds the exact Wasm bytes before the `twep.sig` section;
+catalog hashes and SUIT payload digests are computed over the complete signed
+Wasm file.
 
 The section payload is:
 
@@ -135,11 +137,15 @@ role-specific public key.
 
 The PoC build signs `build/teep-agent.wasm` with the insecure demo TEEP Agent
 code-signing key and signs general app artifacts with the insecure demo app
-code-signing key. `twep-wr` grants TEEP Agent hostcall capability only after the
-TEEP Agent signature verifies. General app execution first checks the Catalog
-File SHA-256 and then verifies the app code-signing signature. A hash mismatch
-continues to map to `app.hash_mismatch`; a code-signature failure maps to
-`app.signature_unverified` through `TWEP_WR_ERR_WASM_SIGNATURE`.
+code-signing key. Both the Linux runtime and TrustZone TA embed only the demo
+TEEP Agent public key and grant TEEP Agent hostcall capability only after the
+`role="teep-agent"` signature verifies. In TrustZone this check occurs before
+WAMR initialization, native-hostcall registration, and `wasm_runtime_load()`;
+failure returns `TEE_ERROR_SECURITY`. General app execution first checks the
+Catalog File SHA-256 and then verifies the app code-signing signature through
+the TEEP_Agent flow. A hash mismatch continues to map to `app.hash_mismatch`;
+a code-signature failure maps to `app.signature_unverified` through
+`TWEP_WR_ERR_WASM_SIGNATURE`. This change adds no public C ABI or CBOR schema.
 
 ## Common Output Schema
 

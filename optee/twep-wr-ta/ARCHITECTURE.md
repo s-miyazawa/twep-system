@@ -133,6 +133,7 @@ flowchart TB
             taapp["ta_app_runtime.c\ngeneral app WAMR execution"]
             tahostcalls["ta_teep_hostcalls.c\nTEEP Agent native hostcalls"]
             tateepruntime["ta_teep_runtime.c\nTEEP Agent WAMR coordination"]
+            tasignature["ta_wasm_signature.c\nTEEP Agent role/signature verification"]
             tarouter["ta_command_router.c\ncommand ID routing table"]
             tabasic["ta_basic_commands.c\nbasic smoke commands"]
             tastorage["ta_secure_storage.c\nmeasurement and generic storage adapter"]
@@ -149,6 +150,7 @@ flowchart TB
         taproduction --> tahostio
         taproduction --> taapp
         taproduction --> tateepruntime
+        tateepruntime --> tasignature
         tateepruntime --> tahostcalls
 
         subgraph wamrdir["wamr-ta/"]

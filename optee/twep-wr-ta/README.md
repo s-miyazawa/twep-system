@@ -79,6 +79,14 @@ the final trust-anchor binding, freshness/revocation policy, Generic EAT, and
 identity conditions are implemented, current TrustZone diagnostics still keep
 `trust-anchor-bound=false` and `final-verified=false`.
 
+Before the privileged TEEP_Agent is loaded, the TA validates its final
+`twep.sig` custom section with the embedded development TEEP Agent P-256 public
+key and requires `role="teep-agent"`. Signature verification precedes WAMR
+initialization, TEEP Agent native-hostcall registration, and
+`wasm_runtime_load()`. The corresponding private key remains only in the
+repository's demo build tooling; this is a PoC trust root, not a production
+credential.
+
 ## TA Command ABI
 
 The scaffold currently fixes these command IDs:
@@ -192,6 +200,8 @@ The production TA runtime owns the following when
 `TWEP_TA_WAMR_LINK=1`:
 
 - TEEP_Agent execution inside TA-local WAMR.
+- Role-specific TEEP_Agent code-signature verification before privileged WAMR
+  loading.
 - Catalog lookup, TC/app classification, payload hash verification, and app
   execution authorization.
 - General app ABI version check, Catalog resource limit application,
@@ -289,6 +299,7 @@ run_trustzone_smokes.sh execute-hostcall-negative
 run_trustzone_smokes.sh execute-cleanup-negative
 run_trustzone_smokes.sh execute-catalog-resource-negative
 run_trustzone_smokes.sh teep-agent-resolve
+run_trustzone_smokes.sh teep-agent-signature-negative
 run_trustzone_smokes.sh teep-agent-resolve-hash-negative
 run_trustzone_smokes.sh teep-agent-resolve-catalog-negative
 run_trustzone_smokes.sh teep-agent-resolve-wrapped-error-negative

@@ -295,7 +295,7 @@ app-output = {
 
 TEEP_Agent also generally follows the Trusted Wasm App ABI. However, it uses the following commands for internal management.
 
-TEEP_Agent Wasm is bundled as a repository build artifact. The Linux backend installs it in the state directory and verifies its demo code-signing identity. The TrustZone path measures the exact bytes loaded by the TA and compares them with the protected identity fixture. Self-update through AttesTAM is outside the current protocol profile.
+TEEP_Agent Wasm is bundled as a repository build artifact. The Linux backend installs it in the state directory and verifies its demo code-signing identity. The TrustZone TA verifies the same role-specific demo signature before enabling TEEP Agent hostcalls or loading it into WAMR, then measures the exact loaded bytes and compares them with the protected identity fixture. Self-update through AttesTAM is outside the current protocol profile.
 
 | command | Meaning |
 | --- | --- |

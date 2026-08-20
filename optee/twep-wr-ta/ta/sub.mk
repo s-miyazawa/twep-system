@@ -9,6 +9,7 @@ srcs-y += ta_host_io_continuation.c
 srcs-y += ta_app_runtime.c
 srcs-y += ta_teep_hostcalls.c
 srcs-y += ta_teep_runtime.c
+srcs-y += ta_wasm_signature.c
 srcs-y += ta_command_router.c
 srcs-y += ta_basic_commands.c
 srcs-y += ta_secure_storage.c

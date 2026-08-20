@@ -2237,6 +2237,81 @@ static void invoke_teep_agent_resolve(struct twep_ta_ctx *ctx,
 	puts("TA production teep-agent resolve executed ok");
 }
 
+static void invoke_teep_agent_signature_negative(
+	struct twep_ta_ctx *ctx, const char *teep_agent_wasm_path,
+	const char *catalog_path, const char *app_wasm_path)
+{
+	static const uint8_t section_name[] = "twep.sig";
+	uint8_t *wasm = NULL;
+	uint8_t *catalog = NULL;
+	uint8_t *app_wasm = NULL;
+	uint8_t *app_input = NULL;
+	uint8_t *request = NULL;
+	uint8_t response[4096];
+	size_t wasm_len = 0;
+	size_t catalog_len = 0;
+	size_t app_wasm_len = 0;
+	size_t app_input_len = 0;
+	size_t request_len = 0;
+	size_t response_len = 0;
+	size_t i;
+	bool tampered = false;
+	TEEC_Result res;
+	uint32_t origin = 0;
+
+	wasm = read_file(teep_agent_wasm_path, &wasm_len);
+	catalog = read_file(catalog_path, &catalog_len);
+	app_wasm = read_file(app_wasm_path, &app_wasm_len);
+	for (i = 0; i + sizeof(section_name) - 1 + 2 + 64 <= wasm_len; i++) {
+		size_t sig_off;
+
+		if (memcmp(wasm + i, section_name, sizeof(section_name) - 1))
+			continue;
+		for (sig_off = i + sizeof(section_name) - 1;
+		     sig_off + 2 + 64 <= wasm_len; sig_off++) {
+			if (wasm[sig_off] == 0x58 && wasm[sig_off + 1] == 0x40) {
+				wasm[sig_off + 2] ^= 0x01;
+				tampered = true;
+				break;
+			}
+		}
+		break;
+	}
+	if (!tampered)
+		errx(1, "teep-agent fixture has no 64-byte twep.sig value");
+	app_input = make_teep_resolve_input(&app_input_len);
+	request = make_teep_resolve_envelope(app_input, app_input_len,
+					     wasm, wasm_len, catalog, catalog_len,
+					     app_wasm, app_wasm_len, &request_len);
+	res = invoke_production_raw(ctx, TA_TWEP_WR_CMD_EXECUTE, request,
+				    request_len, response, sizeof(response),
+				    &response_len, &origin);
+	free(request);
+	if (res != TEEC_ERROR_SECURITY)
+		errx(1, "TA did not reject tampered teep-agent signature: code 0x%x origin 0x%x",
+		     res, origin);
+	puts("TA production rejected tampered teep-agent signature ok");
+
+	request = make_teep_resolve_envelope(app_input, app_input_len,
+					     app_wasm, app_wasm_len,
+					     catalog, catalog_len,
+					     app_wasm, app_wasm_len, &request_len);
+	response_len = 0;
+	origin = 0;
+	res = invoke_production_raw(ctx, TA_TWEP_WR_CMD_EXECUTE, request,
+				    request_len, response, sizeof(response),
+				    &response_len, &origin);
+	free(request);
+	free(app_input);
+	free(app_wasm);
+	free(catalog);
+	free(wasm);
+	if (res != TEEC_ERROR_SECURITY)
+		errx(1, "TA did not reject app-role wasm as teep-agent: code 0x%x origin 0x%x",
+		     res, origin);
+	puts("TA production rejected app-role wasm as teep-agent ok");
+}
+
 static void invoke_teep_agent_resolve_hash_negative(struct twep_ta_ctx *ctx,
 						    const char *teep_agent_wasm_path,
 						    const char *catalog_path,
@@ -4572,7 +4647,7 @@ static void invoke_read_object_small(struct twep_ta_ctx *ctx, const char *name)
 static void usage(const char *argv0)
 {
 	fprintf(stderr,
-		"usage: %s [smoke|status|random-time|cbor-dry-run|abi-vectors <vectors.hex>|execute-abi-negative|execute-helloworld <helloworld.wasm>|execute-calcadd <calcadd.wasm>|execute-negaposi <negaposi.wasm> <input.jpg>|execute-hostcall-negative <env-import.wasm> <teep-env-import.wasm>|execute-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm> <oversized-output.wasm>|execute-catalog-resource-negative <teep-agent.wasm> <catalog.cbor> <negaposi.wasm> <input.jpg>|teep-agent-resolve <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-hash-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-catalog-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-wrapped-error-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|host-io-resume|host-io-resume-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-http-wasm <teep-agent.wasm>|teep-agent-hostcall-evidence-wasm <teep-agent.wasm>|teep-agent-acceptance-probe <teep-agent.wasm>|teep-agent-hostcall-object-negative <teep-agent.wasm>|wamr-spike <helloworld.wasm>|wamr-spike-expect-reject <unsupported.wasm>|wamr-spike-input-negative <helloworld.wasm>|wamr-spike-output-negative <helloworld.wasm> <oversized-output.wasm>|wamr-spike-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm>|provision <object> <file>|read <object>|read-small <object>]\n",
+		"usage: %s [smoke|status|random-time|cbor-dry-run|abi-vectors <vectors.hex>|execute-abi-negative|execute-helloworld <helloworld.wasm>|execute-calcadd <calcadd.wasm>|execute-negaposi <negaposi.wasm> <input.jpg>|execute-hostcall-negative <env-import.wasm> <teep-env-import.wasm>|execute-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm> <oversized-output.wasm>|execute-catalog-resource-negative <teep-agent.wasm> <catalog.cbor> <negaposi.wasm> <input.jpg>|teep-agent-resolve <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-signature-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-hash-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-catalog-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|teep-agent-resolve-wrapped-error-negative <teep-agent.wasm> <catalog.cbor> <helloworld.wasm>|host-io-resume|host-io-resume-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-http-wasm <teep-agent.wasm>|teep-agent-hostcall-evidence-wasm <teep-agent.wasm>|teep-agent-acceptance-probe <teep-agent.wasm>|teep-agent-hostcall-object-negative <teep-agent.wasm>|wamr-spike <helloworld.wasm>|wamr-spike-expect-reject <unsupported.wasm>|wamr-spike-input-negative <helloworld.wasm>|wamr-spike-output-negative <helloworld.wasm> <oversized-output.wasm>|wamr-spike-cleanup-negative <helloworld.wasm> <nonzero-status.wasm> <trap.wasm>|provision <object> <file>|read <object>|read-small <object>]\n",
 		argv0);
 #ifdef TWEP_TA_D043_TEST_HOOKS
 	fprintf(stderr,
@@ -4626,6 +4701,10 @@ int main(int argc, char *argv[])
 							 argv[5]);
 	} else if (argc == 5 && strcmp(argv[1], "teep-agent-resolve") == 0) {
 		invoke_teep_agent_resolve(&ctx, argv[2], argv[3], argv[4]);
+	} else if (argc == 5 &&
+		   strcmp(argv[1], "teep-agent-signature-negative") == 0) {
+		invoke_teep_agent_signature_negative(&ctx, argv[2], argv[3],
+						     argv[4]);
 	} else if (argc == 5 &&
 		   strcmp(argv[1], "teep-agent-resolve-hash-negative") == 0) {
 		invoke_teep_agent_resolve_hash_negative(&ctx, argv[2], argv[3],

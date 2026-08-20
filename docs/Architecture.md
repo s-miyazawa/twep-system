@@ -188,7 +188,7 @@ TEEP_Agent owns the Catalog File and performs both lookup and hash verification.
 
 In the verified academic path, the Catalog File itself is an independent SUIT Trusted Component verified by TEEP_Agent. The SUIT Component Identifier for the Catalog TC is `[ bstr("twep-catalog-v1"), bstr(catalog-name) ]`, with `default` as the accepted catalog name. A `twep-app-v1` app TC cannot modify the Catalog. TrustZone stores one active app in TA-owned two-slot protected state; the `apps/<command>.wasm` name is a TEEP Agent hostcall view of those protected bytes, not an REE cache file.
 
-TEEP_Agent Wasm is bundled as a repository build artifact. The Linux backend installs it into the state directory and verifies its demo code-signing identity. The TrustZone backend measures the exact TEEP_Agent Wasm bytes loaded inside the TA and compares them with protected identity state. Because TEEP_Agent verifies the Catalog File and Trusted Wasm Apps, this repository does not update TEEP_Agent itself through the same AttesTAM session.
+TEEP_Agent Wasm is bundled as a repository build artifact. The Linux backend installs it into the state directory and verifies its demo code-signing identity. The TrustZone TA also verifies `role="teep-agent"` with its embedded demo public key before registering privileged hostcalls or loading the module into WAMR; it then measures the exact TEEP_Agent Wasm bytes loaded inside the TA and compares them with protected identity state. Because TEEP_Agent verifies the Catalog File and Trusted Wasm Apps, this repository does not update TEEP_Agent itself through the same AttesTAM session.
 
 ## TEEP Design
 

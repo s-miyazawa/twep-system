@@ -28,7 +28,7 @@ The platform has two primary backends: plain Linux (Ubuntu 24.04) and TrustZone 
 | twepd | Resident daemon implemented in Go |
 | twep-wr | Public C ABI boundary. The Linux shared library hosts WAMR in the REE; the TrustZone shared library uses `libteec` to invoke TA-local WAMR |
 | Trusted Wasm App | A Wasm app implemented in Rust, based on `no_std`+`alloc`, and using the `twep-app-v1` ABI |
-| TEEP_Agent Trusted Wasm App | A special Wasm app that manages acquisition, update, installation, and loading of Trusted Wasm Apps. It can use file/http/evidence/read-protected/random/time/log hostcalls. It is bundled as a repository build artifact; the Linux backend verifies its demo code-signing identity, while the TrustZone backend additionally measures the exact Wasm bytes loaded inside the TA |
+| TEEP_Agent Trusted Wasm App | A special Wasm app that manages acquisition, update, installation, and loading of Trusted Wasm Apps. It can use file/http/evidence/read-protected/random/time/log hostcalls. It is bundled as a repository build artifact; both backends verify its role-specific demo code-signing identity before loading it, while the TrustZone backend additionally measures the exact Wasm bytes loaded inside the TA |
 | AttesTAM | A TAM server that distributes Trusted Components over TEEP-over-HTTP |
 | Catalog File | A mapping of command names, Wasm app names, versions, hashes, component IDs, and related data |
 | WAMR | Wasm Micro Runtime. The runtime that loads and executes Wasm in the Linux REE backend or inside the TrustZone TA |
@@ -96,7 +96,7 @@ $ twep-cli negaposi -i image.jpg -o output.jpg
 ### TEEP_Agent Trusted Wasm App
 
 - Communicates with AttesTAM using TEEP to acquire, update, and install the Catalog File and Trusted Wasm Apps.
-- The TEEP_Agent itself is the root-side component that verifies the Catalog File and Trusted Wasm Apps. Initial final verified mode does not support self-update through AttesTAM; measurement or pinning is delegated to the platform root of trust.
+- The TEEP_Agent itself is the root-side component that verifies the Catalog File and Trusted Wasm Apps. The TrustZone TA verifies its `role="teep-agent"` ESP256 code signature before WAMR load or privileged-hostcall registration. Initial final verified mode does not support self-update through AttesTAM; measurement or pinning is delegated to the platform root of trust.
 - The Generic EAT format is authoritative for Evidence, and the implementation integrates with the Veraison Generic EAT verifier. The Rust TEEP_Agent generates it with a separate fixed ES256 development key embedded in the Wasm binary. That private key is public and forgeable, so it is not a hardware-protected or production credential and cannot establish `final-verified=true`. Hardware-specific evidence/key binding, such as SGX DCAP quotes, OP-TEE hardware unique keys, and RPMB-derived freshness, is outside the repository's verified protocol profile.
 - Reads and writes the Catalog File stored in a special directory on the Local File System.
 - Resolves a Trusted Wasm App from a command name.
