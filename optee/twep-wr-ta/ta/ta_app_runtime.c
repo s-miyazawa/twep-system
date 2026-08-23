@@ -228,6 +228,7 @@ TEE_Result execute_production_app_wasm(
 	argv[0] = input_ptr;
 	argv[1] = (uint32_t)app_input->len;
 	argv[2] = desc_ptr;
+	twep_ta_apply_instruction_budget(exec_env, limits->timeout_ms);
 	if (!wasm_runtime_call_wasm(exec_env, main_func, 3, argv) ||
 	    (int32_t)argv[0] != 0) {
 		res = TEE_ERROR_GENERIC;
@@ -424,6 +425,7 @@ void production_resource_limits_default(
 	limits->stack_bytes = PRODUCTION_STACK_SIZE;
 	limits->heap_bytes = PRODUCTION_HEAP_SIZE;
 	limits->max_output_bytes = PRODUCTION_MAX_OUTPUT_SIZE;
+	limits->timeout_ms = 0;
 }
 
 static void
@@ -468,6 +470,12 @@ parse_production_resource_limits_map(struct cbor_cursor *cur,
 		} else if (key_eq(key, key_len, "max_output_bytes")) {
 			TEE_Result res = parse_uint32_value(
 				cur, &limits->max_output_bytes);
+
+			if (res != TEE_SUCCESS)
+				return res;
+		} else if (key_eq(key, key_len, "timeout_ms")) {
+			TEE_Result res =
+				parse_uint32_value(cur, &limits->timeout_ms);
 
 			if (res != TEE_SUCCESS)
 				return res;

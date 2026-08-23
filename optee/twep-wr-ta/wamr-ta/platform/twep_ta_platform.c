@@ -129,11 +129,6 @@ double strtod(const char *nptr, char **endptr)
 	return 0;
 }
 
-int twep_ta_isnan(double value)
-{
-	return value != value;
-}
-
 uint64 os_time_get_boot_us(void)
 {
 	TEE_Time time = { };

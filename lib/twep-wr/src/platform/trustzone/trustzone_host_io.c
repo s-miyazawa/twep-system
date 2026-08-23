@@ -65,24 +65,6 @@ static void cbor_write_bytes(uint8_t **p, const uint8_t *bytes, size_t len)
     }
 }
 
-static void cbor_write_bool(uint8_t **p, bool value)
-{
-    *(*p)++ = value ? 0xf5 : 0xf4;
-}
-
-static size_t cbor_text_field_len(const char *key, const char *value)
-{
-    size_t key_len = strlen(key);
-    size_t value_len = strlen(value);
-    return cbor_len_size(key_len) + key_len + cbor_len_size(value_len) + value_len;
-}
-
-static size_t cbor_bytes_field_len(const char *key, size_t value_len)
-{
-    size_t key_len = strlen(key);
-    return cbor_len_size(key_len) + key_len + cbor_len_size(value_len) + value_len;
-}
-
 static bool cbor_text_view_equals(bytes_view_t view, const char *text)
 {
     size_t text_len = strlen(text);

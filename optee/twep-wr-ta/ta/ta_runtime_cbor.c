@@ -131,7 +131,6 @@ static TEE_Result parse_bool_value(struct cbor_cursor *cur)
 	return TEE_SUCCESS;
 }
 
-#ifdef TWEP_TA_WAMR_LINK
 TEE_Result parse_uint32_value(struct cbor_cursor *cur, uint32_t *out)
 {
 	uint64_t value = 0;
@@ -141,7 +140,6 @@ TEE_Result parse_uint32_value(struct cbor_cursor *cur, uint32_t *out)
 	*out = (uint32_t)value;
 	return TEE_SUCCESS;
 }
-#endif
 
 TEE_Result parse_text_value_view(struct cbor_cursor *cur,
 				 struct bytes_view *view)
@@ -215,7 +213,8 @@ TEE_Result parse_production_envelope(const void *buf, size_t len,
 			res = parse_bool_value(&cur);
 			seen.insecure = true;
 		} else if (key_eq(key, key_len, "default_timeout_ms")) {
-			res = parse_uint_value(&cur);
+			res = parse_uint32_value(
+				&cur, &seen.default_timeout_ms_value);
 			seen.default_timeout_ms = true;
 		} else if (key_eq(key, key_len, "max_request_size")) {
 			res = parse_uint_value(&cur);
@@ -234,7 +233,8 @@ TEE_Result parse_production_envelope(const void *buf, size_t len,
 			res = parse_bstr_value_view(&cur, &seen.app_input_view);
 			seen.app_input_cbor = true;
 		} else if (key_eq(key, key_len, "request_timeout_ms")) {
-			res = parse_uint_value(&cur);
+			res = parse_uint32_value(
+				&cur, &seen.request_timeout_ms_value);
 			seen.request_timeout_ms = true;
 		} else if (key_eq(key, key_len, "host_io_result_cbor")) {
 			res = parse_bstr_value_view(&cur,

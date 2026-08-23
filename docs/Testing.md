@@ -54,8 +54,39 @@ Select post-change verification according to the scope of the change using the f
 | AttesTAM insecure, TEEP_Agent, verified dry-run, diagnostics | `make test`, `make e2e-attestam-insecure` | Verify fixture AttesTAM, the `attestam-verified` dry-run, diagnose text/JSON, and prohibition of unverified promotion |
 | Live AttesTAM/Veraison integration | `make e2e-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | Verify challenge-response, Update, Success, and app execution with real AttesTAM/Veraison instances |
 | OP-TEE scaffold, `platform/trustzone`, TA Secure Storage/random/time/CBOR dry-run smoke, WAMR-in-TA spike regression, TA production runtime migration | `make check-optee-trustzone-smokes`, `make smoke-optee-trustzone`, `make smoke-optee-trustzone-failures` as needed; for spike regressions, `make smoke-optee-trustzone-wamr-spike`, `make smoke-optee-trustzone-wamr-spike-linked`, and `make smoke-optee-trustzone-wamr-spike-negatives`; for production runtime implementation slices, `make smoke-optee-trustzone-execute-helloworld`, `make smoke-optee-trustzone-execute-calcadd`, `make smoke-optee-trustzone-execute-negaposi`, `make smoke-optee-trustzone-execute-hostcall-negative`, `make smoke-optee-trustzone-execute-cleanup-negative`, `make smoke-optee-trustzone-execute-catalog-resource-negative`, `make smoke-optee-trustzone-public-abi-resource-limit-negative`, `make smoke-optee-trustzone-teep-agent-resolve`, `make smoke-optee-trustzone-host-io-resume`, `make smoke-optee-trustzone-host-io-resume-negative`, `make smoke-optee-trustzone-teep-agent-hostcall-http`, `make smoke-optee-trustzone-teep-agent-hostcall-evidence`, `make smoke-optee-trustzone-teep-agent-hostcall-bridge`, `make smoke-optee-trustzone-teep-agent-hostcall-object-negative`, and `make smoke-optee-trustzone-teep-agent-transcript-limits`; for live compatibility, `make smoke-optee-trustzone-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | Statically verify alignment among Makefile targets, guest scenarios, and references in `docs/Testing.md`. On QEMU, verify the TEEC roundtrip, TrustZone diagnostics, protected object provisioning, TA random/time, CBOR memref command shape, failure paths, spike regressions, production WAMR execution in the TA, TEEP_Agent/Catalog resolution in the TA, rejection of general app hostcalls, host I/O resume, the TEEP_Agent hostcall broker, resource/output/cleanup boundaries, and live AttesTAM+Verifier compatibility |
+| RISC-V OP-TEE v9 port | `make build-optee-riscv-v9`, then `make smoke-optee-riscv-v9` | Cross-build every normal-world artifact and the TA for RV64 LP64D, package the v9 Buildroot image, then verify OpenSBI/Linux/OP-TEE boot, TA-local WAMR, infinite-loop termination, public ABI v3, `twepd`/`twep-cli`, and absence of kernel panic/Oops/stall diagnostics |
 | Rust/Wasm crate | `cargo test`, `cargo clippy`, and Wasm target build/clippy for the target crate | Preserve the `no_std`/Wasm ABI/hostcall boundaries |
 | docs-only | `git diff --check`, and `make test` when needed | Avoid formatting drift and broken references |
+
+### RISC-V OP-TEE v9
+
+The RISC-V port expects a sibling `../riscv-optee` checkout whose `buildroot`
+link selects v9. Build v9 first so that
+`buildroot/output/host/bin/riscv64-buildroot-linux-gnu-*`, the staged libteec
+headers/libraries, and `export-ta_rv64` exist. The port script also verifies
+the pinned Buildroot and WAMR revisions before using them. Host prerequisites
+are Go 1.22 or newer, Rust with `wasm32-unknown-unknown`, WABT `wat2wasm`,
+CMake, `expect`, `telnet`, `tmux`, and the tools required by `riscv-optee`.
+
+```sh
+make build-optee-riscv-v9
+make smoke-optee-riscv-v9
+```
+
+Override `RISCV_OPTEE_ROOT`, `RISCV_OPTEE_BUILDROOT`,
+`RISCV_OPTEE_WAMR_DIR`, or `RISCV_OPTEE_OUT` for a non-sibling layout. The
+build produces `build/riscv-optee-v9/SHA256SUMS` and updates the v9
+`buildroot/output/images/sdcard.img`. The smoke log is written to
+`build/riscv-optee-v9/qemu-smoke.log` and must end with
+`TWEP_RISCV_OPTEE_V9_SMOKE_PASS`.
+
+The test deliberately executes an infinite-loop Wasm module. It passes only
+when TA-side WAMR instruction metering terminates the module before the
+independent 180-second guest watchdog. Catalog `timeout_ms`, the configured
+default, and a shorter request timeout use the same 100,000-instructions per
+millisecond conversion as the Linux backend; this is a deterministic resource
+budget, not a wall-clock deadline. The architecture-neutral focused entry
+point is `make smoke-optee-trustzone-execute-timeout-negative`.
 
 ### M10 checkpoint
 

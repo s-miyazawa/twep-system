@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 GO ?= go
 CC ?= cc
+.DELETE_ON_ERROR:
 WAMR_DIR ?= $(HOME)/opt/wasm-micro-runtime
 CMAKE ?= cmake
 CARGO ?= cargo
@@ -10,10 +11,14 @@ OPTEE_POSTRUN ?= optee_postrun.py
 VERAISON_PROVISION_URL ?= https://localhost:9443/endorsement-provisioning/v1/submit
 OPTEE_BUILDROOT_TOOLCHAIN ?= $(HOME)/opt/optee/out-br/host/share/buildroot/toolchainfile.cmake
 OPTEE_TWEP_WR_BUILD_DIR ?= build/twep-wr-trustzone-optee
+RISCV_OPTEE_ROOT ?= $(abspath ../riscv-optee)
+RISCV_OPTEE_BUILDROOT ?= $(RISCV_OPTEE_ROOT)/buildroot
+RISCV_OPTEE_WAMR_DIR ?= $(RISCV_OPTEE_ROOT)/workspace/wasm-micro-runtime
+RISCV_OPTEE_OUT ?= build/riscv-optee-v9
 WASM_SIGNER_DEPS := cmd/twep-wasm-sign/main.go internal/wasmsign/wasmsign.go internal/demokeys/keys.go
 TEEP_AGENT_TEST_DEPS := $(wildcard wasm/teep-agent/src/verified/tests/*.rs)
 
-.PHONY: fmt build build-optee-trustzone test check-optee-trustzone-smokes e2e e2e-attestam-insecure e2e-attestam-live attestam-remotehello-fixture register-attestam-remotehello-fixture attestam-helloworld-fixture register-attestam-helloworld-fixture attestam-catalog-fixture attestam-catalog-test-fixtures register-attestam-catalog-fixture register-attestam-app-catalog-fixture veraison-generic-eat-corim provision-veraison-generic-eat-fixture smoke-attestam-insecure smoke-attestam-challenge-observe m10-trustzone-checkpoint smoke-optee-trustzone smoke-optee-trustzone-failures smoke-optee-trustzone-abi-vectors smoke-optee-trustzone-execute-abi-negative smoke-optee-trustzone-execute-helloworld smoke-optee-trustzone-execute-calcadd smoke-optee-trustzone-execute-negaposi smoke-optee-trustzone-execute-hostcall-negative smoke-optee-trustzone-execute-cleanup-negative smoke-optee-trustzone-execute-catalog-resource-negative smoke-optee-trustzone-teep-agent-resolve smoke-optee-trustzone-teep-agent-signature-negative smoke-optee-trustzone-teep-agent-resolve-hash-negative smoke-optee-trustzone-teep-agent-resolve-catalog-negative smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative smoke-optee-trustzone-public-abi-wrapped-error-negative smoke-optee-trustzone-public-abi-app-hash-negative smoke-optee-trustzone-public-abi-resource-limit-negative smoke-optee-trustzone-public-abi-execute-helloworld smoke-optee-trustzone-public-abi-execute-calcadd smoke-optee-trustzone-public-abi-execute-negaposi smoke-optee-trustzone-attestam-live smoke-optee-trustzone-attestam-verified-acceptance smoke-optee-trustzone-attestam-verified-catalog smoke-optee-trustzone-attestam-verified-app smoke-optee-trustzone-host-io-resume smoke-optee-trustzone-host-io-resume-negative smoke-optee-trustzone-sha256-boundary-negative smoke-optee-trustzone-teep-agent-hostcall-http smoke-optee-trustzone-teep-agent-hostcall-evidence smoke-optee-trustzone-teep-agent-hostcall-bridge smoke-optee-trustzone-teep-agent-hostcall-object-negative smoke-optee-trustzone-wamr-spike smoke-optee-trustzone-wamr-spike-linked smoke-optee-trustzone-wamr-spike-linked-negative smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative smoke-optee-trustzone-wamr-spike-negatives clean
+.PHONY: fmt build build-optee-trustzone build-optee-riscv-v9 package-optee-riscv-v9 smoke-optee-riscv-v9 test check-optee-trustzone-smokes e2e e2e-attestam-insecure e2e-attestam-live attestam-remotehello-fixture register-attestam-remotehello-fixture attestam-helloworld-fixture register-attestam-helloworld-fixture attestam-catalog-fixture attestam-catalog-test-fixtures register-attestam-catalog-fixture register-attestam-app-catalog-fixture veraison-generic-eat-corim provision-veraison-generic-eat-fixture smoke-attestam-insecure smoke-attestam-challenge-observe m10-trustzone-checkpoint smoke-optee-trustzone smoke-optee-trustzone-failures smoke-optee-trustzone-abi-vectors smoke-optee-trustzone-execute-abi-negative smoke-optee-trustzone-execute-helloworld smoke-optee-trustzone-execute-timeout-negative smoke-optee-trustzone-execute-calcadd smoke-optee-trustzone-execute-negaposi smoke-optee-trustzone-execute-hostcall-negative smoke-optee-trustzone-execute-cleanup-negative smoke-optee-trustzone-execute-catalog-resource-negative smoke-optee-trustzone-teep-agent-resolve smoke-optee-trustzone-teep-agent-signature-negative smoke-optee-trustzone-teep-agent-resolve-hash-negative smoke-optee-trustzone-teep-agent-resolve-catalog-negative smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative smoke-optee-trustzone-public-abi-wrapped-error-negative smoke-optee-trustzone-public-abi-app-hash-negative smoke-optee-trustzone-public-abi-resource-limit-negative smoke-optee-trustzone-public-abi-execute-helloworld smoke-optee-trustzone-public-abi-execute-calcadd smoke-optee-trustzone-public-abi-execute-negaposi smoke-optee-trustzone-attestam-live smoke-optee-trustzone-attestam-verified-acceptance smoke-optee-trustzone-attestam-verified-catalog smoke-optee-trustzone-attestam-verified-app smoke-optee-trustzone-host-io-resume smoke-optee-trustzone-host-io-resume-negative smoke-optee-trustzone-sha256-boundary-negative smoke-optee-trustzone-teep-agent-hostcall-http smoke-optee-trustzone-teep-agent-hostcall-evidence smoke-optee-trustzone-teep-agent-hostcall-bridge smoke-optee-trustzone-teep-agent-hostcall-object-negative smoke-optee-trustzone-wamr-spike smoke-optee-trustzone-wamr-spike-linked smoke-optee-trustzone-wamr-spike-linked-negative smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative smoke-optee-trustzone-wamr-spike-negatives clean
 .PHONY: smoke-optee-trustzone-teep-agent-acceptance
 .PHONY: smoke-optee-trustzone-teep-agent-acceptance-faults
 .PHONY: smoke-optee-trustzone-teep-agent-transcript-limits
@@ -36,6 +41,20 @@ build/libtwep_wr.so: lib/twep-wr/CMakeLists.txt lib/twep-wr/src/app_runtime.c li
 	cp build/twep-wr/libtwep_wr.so $@
 
 build-optee-trustzone: build/libtwep_wr_trustzone.so
+
+build-optee-riscv-v9:
+	RISCV_OPTEE_ROOT="$(RISCV_OPTEE_ROOT)" \
+	RISCV_OPTEE_BUILDROOT="$(RISCV_OPTEE_BUILDROOT)" \
+	RISCV_OPTEE_WAMR_DIR="$(RISCV_OPTEE_WAMR_DIR)" \
+	RISCV_OPTEE_OUT="$(abspath $(RISCV_OPTEE_OUT))" \
+	./scripts/build_optee_riscv_v9.sh
+
+package-optee-riscv-v9: build-optee-riscv-v9
+
+smoke-optee-riscv-v9: build-optee-riscv-v9
+	RISCV_OPTEE_ROOT="$(RISCV_OPTEE_ROOT)" \
+	RISCV_OPTEE_OUT="$(abspath $(RISCV_OPTEE_OUT))" \
+	./scripts/run_optee_riscv_v9_smoke.sh
 
 build/libtwep_wr_trustzone.so: lib/twep-wr/CMakeLists.txt lib/twep-wr/src/app_runtime.c lib/twep-wr/src/catalog_resolver.c lib/twep-wr/src/response_cbor.c lib/twep-wr/src/runtime.c lib/twep-wr/src/runtime_internal.h lib/twep-wr/src/teep_agent_runtime.c lib/twep-wr/src/wasm_signature.c lib/twep-wr/src/platform/trustzone/platform_trustzone.c lib/twep-wr/src/platform/trustzone/trustzone_artifacts.c lib/twep-wr/src/platform/trustzone/trustzone_candidate.c lib/twep-wr/src/platform/trustzone/trustzone_diagnostics.c lib/twep-wr/src/platform/trustzone/trustzone_envelope.c lib/twep-wr/src/platform/trustzone/trustzone_host_io.c lib/twep-wr/src/platform/trustzone/trustzone_session_storage.c lib/twep-wr/src/platform/trustzone/trustzone_storage.c lib/twep-wr/src/platform/trustzone/trustzone_transport.c lib/twep-wr/src/platform/trustzone/trustzone_internal.h lib/twep-wr/include/twep_wr.h
 	$(CMAKE) -S lib/twep-wr -B $(OPTEE_TWEP_WR_BUILD_DIR) -DCMAKE_TOOLCHAIN_FILE=$(OPTEE_BUILDROOT_TOOLCHAIN) -DWAMR_ROOT_DIR=$(WAMR_DIR) -DTWEP_WR_PLATFORM_BACKEND=trustzone
@@ -292,6 +311,15 @@ smoke-optee-trustzone-execute-helloworld:
 		--expect-ree 'TA production execute helloworld ok' \
 		--expect-ree 'TrustZone TA execute helloworld ok' \
 		--expect-tee 'production executed helloworld'
+
+smoke-optee-trustzone-execute-timeout-negative:
+	./optee/twep-wr-ta/prepare-diagnose-smoke.sh
+	$(MAKE) -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
+	$(OPTEE_POSTRUN) \
+		--project-path $(CURDIR)/optee/twep-wr-ta \
+		--guest-command 'TWEP_TRUSTZONE_RESET_STORAGE=1 ./run_trustzone_smokes.sh execute-timeout-negative' \
+		--expect-ree 'TA production execute helloworld failed' \
+		--expect-ree 'TrustZone TA instruction budget stopped infinite-loop Wasm'
 
 smoke-optee-trustzone-execute-calcadd:
 	./optee/twep-wr-ta/prepare-diagnose-smoke.sh

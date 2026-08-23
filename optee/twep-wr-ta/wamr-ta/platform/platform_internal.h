@@ -92,10 +92,8 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base);
 int strncasecmp(const char *s1, const char *s2, size_t n);
 float strtof(const char *nptr, char **endptr);
 double strtod(const char *nptr, char **endptr);
-int twep_ta_isnan(double value);
-
-#define isnan twep_ta_isnan
-#define signbit(value) ((value) < 0)
+int isnan(double value);
+int signbit(double value);
 
 #ifdef __cplusplus
 }

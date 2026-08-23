@@ -134,6 +134,9 @@ There are two distinct SHA-256 trust boundaries. SHA-256 for Catalog/app/SUIT au
 - Limits may be overridden by the catalog but may not exceed the global maximum.
 - Convert `timeout_ms` to an instruction-count budget and stop WAMR execution when the budget is exceeded.
 - `timeout_ms = 0` means unspecified, not unlimited. Determine the effective timeout from Catalog `resource_limits.timeout_ms` or `twep_wr_config_t.default_timeout_ms`; request `options.timeout_ms` may only shorten it.
+- Linux, ARM OP-TEE, and RISC-V OP-TEE use the same deterministic conversion
+  of 100,000 interpreted instructions per millisecond. This policy bounds
+  computation consistently across backends; it is not a real-time deadline.
 - If the output size is exceeded, reject it with `app.runtime` or `app.output_too_large`.
 
 ## Resolver Modes and Insecure Mode

@@ -4,7 +4,8 @@ package twepwr
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../lib/twep-wr/include
-#cgo LDFLAGS: -L${SRCDIR}/../../build -ltwep_wr -Wl,-rpath,${SRCDIR}/../../build
+#cgo !riscv64 LDFLAGS: -L${SRCDIR}/../../build -ltwep_wr -Wl,-rpath,${SRCDIR}/../../build
+#cgo riscv64 LDFLAGS: -L${SRCDIR}/../../build/riscv64 -ltwep_wr -Wl,-rpath,/usr/lib
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

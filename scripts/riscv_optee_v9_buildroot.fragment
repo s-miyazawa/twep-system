@@ -1,0 +1,4 @@
+# TWEP runtime dependencies for the riscv-optee v9 root filesystem.
+BR2_PACKAGE_OPENSSL=y
+BR2_PACKAGE_LIBOPENSSL=y
+BR2_PACKAGE_CA_CERTIFICATES=y

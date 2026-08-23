@@ -92,6 +92,21 @@ The TrustZone backend has a separate OP-TEE build and QEMU smoke suite. See
 OP-TEE environment, `make build-optee-trustzone`, and the TrustZone smoke
 targets.
 
+For the `riscv-optee` v9 workspace, place `twep-system` and `riscv-optee`
+beside one another, build v9 once to provide its RV64 Buildroot SDK, and run:
+
+```sh
+make build-optee-riscv-v9
+make smoke-optee-riscv-v9
+```
+
+The first target cross-builds the normal-world library, `twepd`, `twep-cli`,
+the diagnostic client, and the WAMR-enabled TA, then installs them into the v9
+Buildroot image. The smoke target boots that image under QEMU and checks
+TA-local WAMR, deterministic instruction metering, public C ABI v3, the full
+daemon/CLI path, and kernel health. The Wasm application artifacts remain the
+same platform-independent binaries used by the Linux and ARM OP-TEE builds.
+
 ## Manual run
 
 Start `twepd` in one terminal:

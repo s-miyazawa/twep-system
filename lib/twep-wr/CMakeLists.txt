@@ -68,6 +68,12 @@ add_library(twep_wr SHARED
   ${WAMR_RUNTIME_LIB_SOURCE}
 )
 
+# Keep -Werror on TWEP sources while allowing the pinned upstream WAMR 2.4.5
+# sources to build with newer cross compilers (notably GCC 14).
+set_source_files_properties(${WAMR_RUNTIME_LIB_SOURCE}
+  PROPERTIES COMPILE_OPTIONS "-Wno-error"
+)
+
 target_include_directories(twep_wr PRIVATE
   include
   src
@@ -78,6 +84,9 @@ if(TWEP_WR_PLATFORM_BACKEND STREQUAL "trustzone")
   target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_TRUSTZONE=1)
   set(TWEP_WR_TEEC_EXPORT "$ENV{HOME}/opt/optee/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr" CACHE PATH "OP-TEE client export prefix for TrustZone backend")
   set(TWEP_WR_TEEC_LIB_DIR "${TWEP_WR_TEEC_EXPORT}/lib" CACHE PATH "OP-TEE libteec directory for TrustZone backend")
+  if(NOT EXISTS "${TWEP_WR_TEEC_EXPORT}/include/tee_client_api.h")
+    message(FATAL_ERROR "tee_client_api.h not found below TWEP_WR_TEEC_EXPORT=${TWEP_WR_TEEC_EXPORT}")
+  endif()
   target_include_directories(twep_wr PRIVATE
     ${TWEP_WR_TEEC_EXPORT}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../optee/twep-wr-ta/ta/include

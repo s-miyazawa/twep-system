@@ -7,31 +7,40 @@ set -eu
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "${PROJECT_DIR}/../.." && pwd)
 TEEP_AGENT_WASM=${TWEP_TEEP_AGENT_WASM:-${REPO_ROOT}/build/teep-agent.wasm}
-GUEST_DIR="${PROJECT_DIR}/guest"
-TRUSTZONE_BUILD_DIR="${REPO_ROOT}/build/twep-wr-trustzone"
+GUEST_DIR=${TWEP_GUEST_DIR:-${PROJECT_DIR}/guest}
+TRUSTZONE_BUILD_DIR=${TWEP_TRUSTZONE_BUILD_DIR:-${REPO_ROOT}/build/twep-wr-trustzone}
+TARGET_GOARCH=${TARGET_GOARCH:-arm64}
 TEEC_EXPORT=${TEEC_EXPORT:-${HOME}/opt/optee/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr}
 TEEC_LIB_DIR=${TEEC_LIB_DIR:-${HOME}/opt/optee/out-br/build/optee_client_ext-1.0/libteec}
 HOST_CC=${HOST_CC:-${HOME}/opt/optee/out-br/host/bin/aarch64-buildroot-linux-gnu-gcc}
 WAMR_ROOT_DIR=${WAMR_ROOT_DIR:-${HOME}/opt/wasm-micro-runtime}
+CMAKE=${CMAKE:-cmake}
+CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE:-}
+CMAKE_FRESH=${CMAKE_FRESH:-0}
 
-make -C "${REPO_ROOT}" bin/twepd bin/twep-cli build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm build/negaposi.wasm build/catalog.dev.json build/catalog.dev.cbor
-cmake -S "${REPO_ROOT}/lib/twep-wr" -B "${TRUSTZONE_BUILD_DIR}" \
+make -C "${REPO_ROOT}" build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm build/negaposi.wasm build/catalog.dev.json build/catalog.dev.cbor
+set -- "${CMAKE}" -S "${REPO_ROOT}/lib/twep-wr" -B "${TRUSTZONE_BUILD_DIR}" \
 	-DWAMR_ROOT_DIR="${WAMR_ROOT_DIR}" \
 	-DTWEP_WR_PLATFORM_BACKEND=trustzone \
 	-DTWEP_WR_TEEC_EXPORT="${TEEC_EXPORT}" \
 	-DTWEP_WR_TEEC_LIB_DIR="${TEEC_LIB_DIR}"
-cmake --build "${TRUSTZONE_BUILD_DIR}"
+if [ "${CMAKE_FRESH}" = "1" ]; then
+	set -- "$@" --fresh
+fi
+if [ -n "${CMAKE_TOOLCHAIN_FILE}" ]; then
+	set -- "$@" -DCMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE}"
+fi
+"$@"
+"${CMAKE}" --build "${TRUSTZONE_BUILD_DIR}"
 
 rm -rf "${GUEST_DIR}"
 mkdir -p "${GUEST_DIR}/bin" "${GUEST_DIR}/build"
 mkdir -p "${GUEST_DIR}/fixtures"
-GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC="${HOST_CC}" \
+GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=1 CC="${HOST_CC}" \
 	CGO_CFLAGS="-I${REPO_ROOT}/lib/twep-wr/include" \
 	CGO_LDFLAGS="-L${TRUSTZONE_BUILD_DIR} -ltwep_wr -Wl,-rpath,/usr/lib -L${TEEC_LIB_DIR} -lteec" \
 	go build -o "${GUEST_DIR}/bin/twepd" "${REPO_ROOT}/cmd/twepd"
-GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC="${HOST_CC}" \
-	CGO_CFLAGS="-I${REPO_ROOT}/lib/twep-wr/include" \
-	CGO_LDFLAGS="-L${TRUSTZONE_BUILD_DIR} -ltwep_wr -Wl,-rpath,/usr/lib -L${TEEC_LIB_DIR} -lteec" \
+GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=0 \
 	go build -o "${GUEST_DIR}/bin/twep-cli" "${REPO_ROOT}/cmd/twep-cli"
 "${HOST_CC}" -Wall -Wextra -Werror \
 	-I"${REPO_ROOT}/lib/twep-wr/include" \
@@ -51,6 +60,8 @@ cp "${REPO_ROOT}/build/catalog.dev.cbor" "${GUEST_DIR}/build/catalog.dev.cbor"
 cp "${REPO_ROOT}/testdata/images/input.jpg" "${GUEST_DIR}/fixtures/input.jpg"
 cp "${REPO_ROOT}/testdata/abi/vectors.hex" "${GUEST_DIR}/fixtures/abi-vectors.hex"
 cp "${TRUSTZONE_BUILD_DIR}/libtwep_wr.so" "${GUEST_DIR}/build/libtwep_wr.so"
+wat2wasm "${PROJECT_DIR}/wasm/infinite-app.wat" \
+	-o "${GUEST_DIR}/build/infinite-app.wasm"
 printf '%s' '0061736d01000000010401600000021a0103656e7612666f7262696464656e5f686f737463616c6c0000' | xxd -r -p >"${GUEST_DIR}/build/unsupported-import.wasm"
 printf '%s' '0061736d010000000104016000000215010d747765705f746565705f656e76036c6f670000' | xxd -r -p >"${GUEST_DIR}/build/teep-env-import.wasm"
 printf '%s' '0061736d01000000010d0260037f7f7f017f60027f7f0003030200010503010001072a03066d656d6f727902000d747765705f6170705f6d61696e00000d747765705f6170705f6672656500010a1802130020024110360200200241810136020441000b02000b' | xxd -r -p >"${GUEST_DIR}/build/oversized-output.wasm"

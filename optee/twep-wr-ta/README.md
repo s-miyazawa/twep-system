@@ -207,6 +207,9 @@ The production TA runtime owns the following when
 - General app ABI version check, Catalog resource limit application,
   `twep_app_main`, `twep_app_free`, app output CBOR wrapping, and cleanup after
   each execution.
+- Deterministic WAMR instruction metering for the TEEP Agent, spike path, and
+  general applications. Catalog or default timeout policy supplies the upper
+  budget and a request timeout may only shorten it; zero is never unlimited.
 - TEEP_Agent-only `twep_teep_env` hostcalls backed by TA/TEE APIs or explicit
   host I/O resume.
 
@@ -293,6 +296,7 @@ run_trustzone_smokes.sh failures
 run_trustzone_smokes.sh abi-vectors
 run_trustzone_smokes.sh execute-abi-negative
 run_trustzone_smokes.sh execute-helloworld
+run_trustzone_smokes.sh execute-timeout-negative
 run_trustzone_smokes.sh execute-calcadd
 run_trustzone_smokes.sh execute-negaposi
 run_trustzone_smokes.sh execute-hostcall-negative

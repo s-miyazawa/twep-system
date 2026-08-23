@@ -48,6 +48,14 @@ twep_ta_cmd_production_envelope(uint32_t param_types, TEE_Param params[4],
 		     label);
 		return res;
 	}
+	if (kind == TWEP_TA_ENVELOPE_INIT) {
+		g_session->default_timeout_ms = seen.default_timeout_ms_value
+						? seen.default_timeout_ms_value
+						: PRODUCTION_DEFAULT_TIMEOUT_MS;
+		g_session->request_timeout_ms = 0;
+	} else if (kind == TWEP_TA_ENVELOPE_EXECUTE) {
+		g_session->request_timeout_ms = seen.request_timeout_ms_value;
+	}
 
 	if (kind == TWEP_TA_ENVELOPE_EXECUTE &&
 	    bytes_view_eq(&seen.command_view, "teep-agent-host-io")) {
@@ -429,6 +437,7 @@ TEE_Result twep_ta_session_open(void **session)
 	ctx = TEE_Malloc(sizeof(*ctx), TEE_MALLOC_FILL_ZERO);
 	if (!ctx)
 		return TEE_ERROR_OUT_OF_MEMORY;
+	ctx->default_timeout_ms = PRODUCTION_DEFAULT_TIMEOUT_MS;
 	*session = ctx;
 	return TEE_SUCCESS;
 }

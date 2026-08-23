@@ -8,12 +8,13 @@ PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=optee_example_twep_wr_ta
 
 usage() {
-	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-signature-negative|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|attestam-verified-app|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
+	echo "usage: $0 [default|diagnose|provision|failures|abi-vectors|execute-abi-negative|execute-helloworld|execute-timeout-negative|execute-calcadd|execute-negaposi|execute-hostcall-negative|execute-cleanup-negative|execute-catalog-resource-negative|teep-agent-resolve|teep-agent-signature-negative|teep-agent-resolve-hash-negative|teep-agent-resolve-catalog-negative|teep-agent-resolve-wrapped-error-negative|public-abi-wrapped-error-negative|public-abi-app-hash-negative|public-abi-resource-limit-negative|public-abi-execute-helloworld|public-abi-execute-calcadd|public-abi-execute-negaposi|attestam-live|attestam-verified-acceptance|attestam-verified-catalog|attestam-verified-app|host-io-resume|host-io-resume-negative|sha256-boundary-negative|teep-agent-hostcall-http|teep-agent-hostcall-evidence|teep-agent-transcript-limits|teep-agent-hostcall-bridge|teep-agent-acceptance|teep-agent-acceptance-faults|teep-agent-two-session-generation|teep-agent-hostcall-object-negative|wamr-spike|wamr-spike-linked|wamr-spike-linked-negative|wamr-spike-input-negative|wamr-spike-output-negative|wamr-spike-cleanup-negative|wamr-spike-negatives|all]" >&2
 }
 
 reset_guest_secure_storage() {
-	if [ "${TWEP_TRUSTZONE_RESET_STORAGE:-0}" = "1" ] && [ -d /var/lib/tee ] && [ -e /dev/tee0 ]; then
-		rm -rf /var/lib/tee/*
+	tee_fs_parent=${TWEP_TEE_FS_PARENT:-/var/lib/tee}
+	if [ "${TWEP_TRUSTZONE_RESET_STORAGE:-0}" = "1" ] && [ -d "${tee_fs_parent}" ] && [ -e /dev/tee0 ]; then
+		find "${tee_fs_parent}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 		sync
 	fi
 }
@@ -76,6 +77,41 @@ run_execute_helloworld() {
 	grep -q "TA production execute helloworld ok" "/tmp/twep-trustzone-execute-helloworld.log"
 	cat "/tmp/twep-trustzone-execute-helloworld.log"
 	echo "TrustZone TA execute helloworld ok"
+}
+
+run_execute_timeout_negative() {
+	log=/tmp/twep-trustzone-execute-timeout-negative.log
+	watchdog_marker=/tmp/twep-trustzone-execute-timeout-watchdog
+	rm -f "${watchdog_marker}"
+	"${APP}" execute-helloworld \
+		"${PROJECT_DIR}/guest/build/infinite-app.wasm" >"${log}" 2>&1 &
+	app_pid=$!
+	(
+		sleep 180
+		if kill -0 "${app_pid}" 2>/dev/null; then
+			: >"${watchdog_marker}"
+			kill -TERM "${app_pid}" 2>/dev/null || true
+		fi
+	) &
+	watchdog_pid=$!
+	if wait "${app_pid}"; then
+		status=0
+	else
+		status=$?
+	fi
+	kill "${watchdog_pid}" 2>/dev/null || true
+	wait "${watchdog_pid}" 2>/dev/null || true
+	cat "${log}"
+	if [ "${status}" -eq 0 ]; then
+		echo "infinite-loop Wasm unexpectedly succeeded" >&2
+		return 1
+	fi
+	if [ -e "${watchdog_marker}" ]; then
+		echo "TA instruction budget did not stop infinite-loop Wasm" >&2
+		return 1
+	fi
+	grep -q "TA production execute helloworld failed" "${log}"
+	echo "TrustZone TA instruction budget stopped infinite-loop Wasm"
 }
 
 run_execute_calcadd() {
@@ -865,6 +901,9 @@ execute-abi-negative)
 	;;
 execute-helloworld)
 	run_execute_helloworld
+	;;
+execute-timeout-negative)
+	run_execute_timeout_negative
 	;;
 execute-calcadd)
 	run_execute_calcadd

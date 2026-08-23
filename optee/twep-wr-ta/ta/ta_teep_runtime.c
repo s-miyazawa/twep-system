@@ -3,6 +3,27 @@
 #include "ta_runtime_internal.h"
 
 #ifdef TWEP_TA_WAMR_LINK
+void twep_ta_apply_instruction_budget(wasm_exec_env_t exec_env,
+				      uint32_t catalog_timeout_ms)
+{
+	uint32_t upper_timeout_ms = catalog_timeout_ms;
+	uint32_t request_timeout_ms = 0;
+	uint64_t budget = 0;
+
+	if (!upper_timeout_ms)
+		upper_timeout_ms = g_session && g_session->default_timeout_ms
+					   ? g_session->default_timeout_ms
+					   : PRODUCTION_DEFAULT_TIMEOUT_MS;
+	if (g_session)
+		request_timeout_ms = g_session->request_timeout_ms;
+	if (request_timeout_ms && request_timeout_ms < upper_timeout_ms)
+		upper_timeout_ms = request_timeout_ms;
+	budget = (uint64_t)upper_timeout_ms * 100000u;
+	if (budget > INT32_MAX)
+		budget = INT32_MAX;
+	wasm_runtime_set_instruction_count_limit(exec_env, (int)budget);
+}
+
 bool twep_ta_ensure_wamr_runtime(void)
 {
 	if (g_wamr_runtime_initialized)
@@ -190,6 +211,7 @@ TEE_Result execute_teep_agent_resolve(
 	argv[0] = input_ptr;
 	argv[1] = (uint32_t)input->len;
 	argv[2] = desc_ptr;
+	twep_ta_apply_instruction_budget(exec_env, 0);
 	if (!wasm_runtime_call_wasm(exec_env, main_func, 3, argv)) {
 		if (host_ctx.pending != TEEP_AGENT_PENDING_NONE) {
 			res = teep_agent_pending_to_need_host_io(

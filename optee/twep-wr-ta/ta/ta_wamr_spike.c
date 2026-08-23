@@ -1,7 +1,7 @@
 /* Copyright (c) 2026 SECOM CO., LTD. All rights reserved. */
 /* SPDX-License-Identifier: BSD-2-Clause */
 
-#include "ta_internal.h"
+#include "ta_runtime_internal.h"
 
 #include <stdint.h>
 #include <tee_internal_api_extensions.h>
@@ -188,6 +188,7 @@ TEE_Result twep_ta_cmd_wamr_spike_exec(uint32_t param_types,
 	argv[0] = input_ptr;
 	argv[1] = (uint32_t)params[1].memref.size;
 	argv[2] = desc_ptr;
+	twep_ta_apply_instruction_budget(exec_env, 0);
 	if (!wasm_runtime_call_wasm(exec_env, main_func, 3, argv)) {
 		EMSG("twep-wr-ta WAMR spike call failed: %s",
 		     wasm_runtime_get_exception(module_inst));

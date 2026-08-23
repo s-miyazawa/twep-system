@@ -21,6 +21,7 @@
 /* Bounded for a 128 KiB D047 response plus verified Catalog/COSE worksets. */
 #define PRODUCTION_HEAP_SIZE (512 * 1024)
 #define PRODUCTION_MAX_OUTPUT_SIZE (16 * 1024)
+#define PRODUCTION_DEFAULT_TIMEOUT_MS 5000
 #define TEEP_AGENT_TRANSIENT_OBJECTS_MAX 64
 #define TEEP_AGENT_TRANSIENT_OBJECT_NAME_MAX 96
 #define TEEP_AGENT_TRANSIENT_OBJECT_SIZE_MAX (16 * 1024)
@@ -46,6 +47,7 @@ struct production_resource_limits {
 	uint32_t stack_bytes;
 	uint32_t heap_bytes;
 	uint32_t max_output_bytes;
+	uint32_t timeout_ms;
 };
 
 enum teep_agent_pending_hostcall {
@@ -65,6 +67,8 @@ struct production_envelope_seen {
 	bool command;
 	bool app_input_cbor;
 	bool request_timeout_ms;
+	uint32_t default_timeout_ms_value;
+	uint32_t request_timeout_ms_value;
 	bool host_io_result_cbor;
 	struct bytes_view request_id_view;
 	struct bytes_view command_view;
@@ -139,6 +143,8 @@ struct teep_agent_live_session {
 #endif
 
 struct twep_wr_session {
+	uint32_t default_timeout_ms;
+	uint32_t request_timeout_ms;
 	struct pending_host_io_state pending_host_io;
 #ifdef TWEP_TA_WAMR_LINK
 	struct pending_teep_live_state pending_teep_live;
@@ -193,6 +199,9 @@ TWEP_TA_HIDDEN extern bool g_wamr_runtime_initialized;
 TWEP_TA_HIDDEN extern bool g_teep_agent_natives_registered;
 TWEP_TA_HIDDEN extern size_t g_teep_agent_live_session_count;
 TWEP_TA_HIDDEN extern NativeSymbol teep_agent_native_symbols[14];
+TWEP_TA_HIDDEN void
+twep_ta_apply_instruction_budget(wasm_exec_env_t exec_env,
+				 uint32_t catalog_timeout_ms);
 #endif
 
 TWEP_TA_HIDDEN TEE_Result build_app_runtime_error_execute_response(
