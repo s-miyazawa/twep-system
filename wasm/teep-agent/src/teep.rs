@@ -87,12 +87,18 @@ pub(crate) fn query_response_payload_with_attestation(
     let mut payload = Vec::new();
     cbor::write_array(&mut payload, 2).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_uint(&mut payload, 2).ok_or(QueryResponsePayloadError::EncodeFailed)?;
-    cbor::write_map(&mut payload, 3).ok_or(QueryResponsePayloadError::EncodeFailed)?;
+    cbor::write_map(&mut payload, 4).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_uint(&mut payload, 5).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_uint(&mut payload, 0).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_uint(&mut payload, 6).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_bytes(&mut payload, attestation_payload)
         .ok_or(QueryResponsePayloadError::EncodeFailed)?;
+    cbor::write_uint(&mut payload, 12).ok_or(QueryResponsePayloadError::EncodeFailed)?;
+    cbor::write_text(
+        &mut payload,
+        b"application/eat+cwt; eat_profile=\"urn:ietf:rfc:rfc9711\"",
+    )
+    .ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_uint(&mut payload, 13).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_array(&mut payload, 1).ok_or(QueryResponsePayloadError::EncodeFailed)?;
     cbor::write_map(&mut payload, 1).ok_or(QueryResponsePayloadError::EncodeFailed)?;
@@ -215,11 +221,17 @@ mod tests {
         let mut want = Vec::new();
         cbor::write_array(&mut want, 2).unwrap();
         cbor::write_uint(&mut want, 2).unwrap();
-        cbor::write_map(&mut want, 3).unwrap();
+        cbor::write_map(&mut want, 4).unwrap();
         cbor::write_uint(&mut want, 5).unwrap();
         cbor::write_uint(&mut want, 0).unwrap();
         cbor::write_uint(&mut want, 6).unwrap();
         cbor::write_bytes(&mut want, b"evidence").unwrap();
+        cbor::write_uint(&mut want, 12).unwrap();
+        cbor::write_text(
+            &mut want,
+            b"application/eat+cwt; eat_profile=\"urn:ietf:rfc:rfc9711\"",
+        )
+        .unwrap();
         cbor::write_uint(&mut want, 13).unwrap();
         cbor::write_array(&mut want, 1).unwrap();
         cbor::write_map(&mut want, 1).unwrap();

@@ -363,6 +363,14 @@ twep-app-install-metadata = {
 
 From Milestone 9 onward, the metadata key above is not used as the basis for classification. In the AttesTAM TEEP flow, `requested-tc-list[*].component-id` and `tc-list[*].system-component-id` in QueryResponse are the TAM-side manifest lookup keys, so twep app classification is also based on the SUIT Component Identifier.
 
+An Evidence-bearing QueryResponse includes option 12 with the exact media type
+`application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`. This selects the
+Generic EAT verifier and permits AttesTAM to decode the Evidence nonce before
+creating the Veraison challenge-response session. The Veraison session nonce,
+the EAT nonce, and the outstanding TEEP QueryRequest challenge must represent
+the same bytes; a successful EAR with an unrelated nonce is not sufficient for
+TEEP Agent authentication.
+
 ```cddl
 twep-app-component-id = [
   bstr .size 11, ; UTF-8 bytes for "twep-app-v1"

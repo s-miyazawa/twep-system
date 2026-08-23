@@ -131,6 +131,13 @@ own configuration. Confirm that the Generic EAT media type is registered:
 application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"
 ```
 
+The Evidence-bearing TEEP QueryResponse must carry this value in option 12.
+AttesTAM must also create the Veraison challenge-response session with the
+base64url-encoded nonce extracted from that Evidence, rather than a fixed demo
+nonce. AttesTAM independently matches the verified nonce to its outstanding
+TEEP QueryRequest challenge, so a fixed Veraison session nonce cannot
+authenticate a normal live exchange with a freshly generated challenge.
+
 Provision the repository's deliberately insecure Generic EAT CoRIM fixture:
 
 ```sh
@@ -262,6 +269,40 @@ QueryResponse; the TEEP Agent therefore requires the existing protected
 acceptance generation to remain current and binds the Update to the new
 session's rolling tokens and exact preceding QueryResponse. All retain
 `final-verified=false` because they use fixed development credentials.
+
+## Validate on riscv-optee v9
+
+Place `twep-system` and `riscv-optee` beside one another and first complete the
+baseline `make smoke-optee-riscv-v9`. Keep disposable host AttesTAM and
+Veraison services running, provision the Generic EAT CoRIM, and register the
+fixture required by the selected phase. The QEMU guest reaches the host through
+`10.0.2.2` by default.
+
+```sh
+make smoke-optee-riscv-v9-attestam-live \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam
+
+make smoke-optee-riscv-v9-attestam-verified-catalog \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam
+
+make smoke-optee-riscv-v9-attestam-verified-app \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam
+```
+
+The Catalog target deliberately rebuilds the TA with D043 fault-injection
+hooks and checks inactive-slot publication, restart/readback, equal-sequence
+and replay rejection, pre-publication failure, D043-publication failure, and
+preservation across a later non-Catalog acceptance. Rebuild without those hooks
+before running or deploying the app target. The app target checks protected
+Catalog installation, protected `helloworld` installation and TA-local
+execution, then starts fresh host processes with an unreachable TAM and proves
+offline execution after restart. Each runner performs a clean guest poweroff so
+the v9 ext2 image is not left dirty by abrupt QEMU termination.
+
+All three targets require `final-verified=false`: the published development
+keys are forgeable and OP-TEE REE FS Secure Storage on this platform does not
+claim rollback protection. A successful run validates integration and
+persistence mechanics, not production attestation assurance.
 
 ## Expected behavior and troubleshooting
 

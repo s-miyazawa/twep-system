@@ -44,7 +44,9 @@ run_ok public_abi_helloworld "$smoke_env /opt/twep/run_trustzone_smokes.sh publi
 run_ok public_abi_calcadd "$smoke_env /opt/twep/run_trustzone_smokes.sh public-abi-execute-calcadd"
 run_ok daemon_helloworld {state=/tmp/twepd-v9; mkdir -p "$state/run"; cd /opt/twep/guest; twepd --socket "$state/run/twepd.sock" --state-dir "$state" --once >"$state/twepd.log" 2>&1 & pid=$!; i=0; while test $i -lt 100 && test ! -S "$state/run/twepd.sock"; do sleep 0.1; i=$((i+1)); done; twep-cli --socket "$state/run/twepd.sock" helloworld >"$state/cli.out"; cli_rc=$?; wait $pid; daemon_rc=$?; cat "$state/cli.out"; cat "$state/twepd.log"; test $cli_rc -eq 0; test $daemon_rc -eq 0; grep -Fx 'Hello, World!!' "$state/cli.out"}
 run_ok kernel_health {dmesg | tail -n 120; ! dmesg | grep -Ei 'panic|Oops|soft lockup|rcu.*stall'}
-send "exit\r"
-expect -re {buildroot login:}
-close
+send -- "sync; poweroff\r"
+expect {
+    eof {}
+    timeout { puts stderr "ERROR: timed out waiting for QEMU poweroff"; exit 12 }
+}
 wait

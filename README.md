@@ -98,6 +98,14 @@ beside one another, build v9 once to provide its RV64 Buildroot SDK, and run:
 ```sh
 make build-optee-riscv-v9
 make smoke-optee-riscv-v9
+
+# With disposable AttesTAM and Veraison services already provisioned:
+make smoke-optee-riscv-v9-attestam-live \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam
+make smoke-optee-riscv-v9-attestam-verified-catalog \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam
+make smoke-optee-riscv-v9-attestam-verified-app \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam
 ```
 
 The first target cross-builds the normal-world library, `twepd`, `twep-cli`,
@@ -106,6 +114,11 @@ Buildroot image. The smoke target boots that image under QEMU and checks
 TA-local WAMR, deterministic instruction metering, public C ABI v3, the full
 daemon/CLI path, and kernel health. The Wasm application artifacts remain the
 same platform-independent binaries used by the Linux and ARM OP-TEE builds.
+The live targets exercise the AttesTAM/Veraison challenge-response, protected
+Catalog, restart/fault, protected app, and offline-restart paths on RV64. See
+[docs/AttesTAM.md](docs/AttesTAM.md) first; registration is sequence-sensitive
+and the corresponding manifests must already be registered in a fresh
+disposable AttesTAM database.
 
 ## Manual run
 
