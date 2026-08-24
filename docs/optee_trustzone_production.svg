@@ -42,7 +42,7 @@
   <path d="M610 350H670" class="solid greenLine"/><text x="640" y="326" class="small center">cgo</text>
 
   <rect x="215" y="500" width="365" height="132" rx="14" class="card purpleCard"/>
-  <text x="397" y="545" class="boxTitle center">libtwep_wr.so</text><text x="397" y="580" class="body center">C ABI v3</text><text x="397" y="610" class="body center">platform/trustzone</text>
+  <text x="397" y="545" class="boxTitle center">libtwep_wr.so</text><text x="397" y="580" class="body center">C ABI v3</text><text x="397" y="610" class="body center">optee-common + profile leaf</text>
   <rect x="690" y="510" width="210" height="112" rx="13" class="card whiteCard"/>
   <text x="795" y="553" class="boxTitle center">libteec</text><text x="795" y="589" class="body center">TEEC API</text>
   <path d="M810 405V450Q810 475 785 475H397V490" class="solid purpleLine"/>

@@ -1,8 +1,13 @@
-# twep-wr OP-TEE TrustZone Backend Project
+# twep-wr OP-TEE Backend Project
 
-This directory contains the current OP-TEE scaffold for the `twep-wr`
-TrustZone backend. It started as a smoke-test project and now implements the
-TrustZone `twep_wr_execute` path through TA-local WAMR execution while
+The TA is shared by the explicit `arm-optee` and `riscv-optee` profiles.
+`TWEP_TA_PLATFORM_BACKEND` is validated and compiled into TA diagnostics; all
+TA-local locations are `optee-ta`. Existing ARM smoke target names retain
+`trustzone` for command-line compatibility only.
+
+This directory contains the shared TA and smoke project for the `twep-wr`
+ARM OP-TEE and RISC-V OP-TEE profiles. It started as a smoke-test project and
+now implements both OP-TEE `twep_wr_execute` paths through TA-local WAMR while
 preserving public C ABI v3. TA-local TEEP_Agent, Catalog resolution, and
 ordinary app execution are implemented behind the same opt-in WAMR link flag
 documented in [TA WAMR build flag](#ta-wamr-build-flag).
@@ -18,17 +23,17 @@ reading code, logs, or smoke results.
 
 | Path | Entry point | Purpose | Trust decision owner |
 | --- | --- | --- | --- |
-| Production public path | `twepd` -> `internal/twepwr` -> `libtwep_wr.so` -> `libteec` -> TA `EXECUTE`/`RESUME_HOST_IO` | The target TrustZone backend path for user commands. It preserves public C ABI v3 while moving TEEP_Agent, Catalog resolution, and app execution into the TA. Wasm execution requires the TA to be built with `TWEP_TA_WAMR_LINK=1`. | TA-local TEEP_Agent and TA-local production runtime |
+| Production public path | `twepd` -> `internal/twepwr` -> `libtwep_wr.so` -> `libteec` -> TA `EXECUTE`/`RESUME_HOST_IO` | The target OP-TEE path for user commands. It preserves public C ABI v3 while moving TEEP_Agent, Catalog resolution, and app execution into the TA. Wasm execution requires the TA to be built with `TWEP_TA_WAMR_LINK=1`. | TA-local TEEP_Agent and TA-local production runtime |
 | Direct TA smoke path | `optee_example_twep_wr_ta` -> `libteec` -> TA private commands | Fast boundary validation for TEEC session handling, TA command ABI, secure storage, random/time, diagnostics, and focused negative cases. | The smoke checks transport and TA behavior; it is not the public `twepd` path |
 | WAMR spike path | `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` | Regression-only feasibility check for the original WAMR-in-TA spike command. Uses the same `TWEP_TA_WAMR_LINK=1` build as production TA WAMR, but remains a separate command entrypoint. | None for production trust; do not treat it as `twep_wr_execute` |
 
-The normal user-facing TrustZone flow is the production public path:
+The normal user-facing OP-TEE flow is the production public path:
 
 ```text
 twep-cli
   -> twepd
   -> internal/twepwr cgo wrapper
-  -> libtwep_wr.so platform/trustzone
+  -> libtwep_wr.so platform/optee-common + arm-optee/riscv-optee
   -> libteec / TEEC_InvokeCommand
   -> twep-wr TA
 ```
@@ -43,11 +48,11 @@ The TA and REE host app currently validate these boundaries:
 - OP-TEE random/time command smoke through private TA commands
   (`TA_TWEP_WR_CMD_GET_RANDOM`, `TA_TWEP_WR_CMD_GET_TIME`). The TA platform
   status string still reports `random=false` and `time=false` because the
-  public `libtwep_wr.so` TrustZone platform API does not expose those
+  public `libtwep_wr.so` OP-TEE platform API does not expose those
   primitives to REE callers.
 - CBOR request/response memref command shape smoke.
 - TrustZone `twep-cli diagnose verified` artifacts through the
-  `platform/trustzone` backend, including `agent-identity-status.txt` with
+  selected OP-TEE profile, including `agent-identity-status.txt` with
   `agent-identity-source=platform-status-ta-local`,
   `protected-agent-identity-load=loaded-unbound` after provisioning, and
   `agent-identity-binding=matched-unbound` when the provisioned identity
@@ -64,9 +69,9 @@ The TA and REE host app currently validate these boundaries:
   These paths require `TWEP_TA_WAMR_LINK=1` at TA build time; the
   repository `Makefile` sets that flag for the relevant smoke targets.
 
-The TrustZone backend is labeled `tee-ree-fs-secure-storage` for the permanent
+Both OP-TEE profiles are labeled `tee-ree-fs-secure-storage` for the permanent
 `CFG_REE_FS=y`, `CFG_RPMB_FS=n` configuration. This repository adopts OP-TEE
-REE FS Secure Storage as the TrustZone secure storage policy and excludes
+REE FS Secure Storage as the OP-TEE secure storage policy and excludes
 rollback attacks from the threat model. `sealed-storage-rollback-protected=false`
 is diagnostic information, not a final verified blocker. Secure storage
 roundtrips alone are still not enough for `trust-anchor-bound=true` or
@@ -113,8 +118,8 @@ does not parse requests or execute WAMR.
 Wasm bytes inside the TA. It is not a TA-loaded/executed module identity
 binding signal and does not establish final trust evidence. There is no direct
 `optee_example_twep_wr_ta` smoke for this command; `libtwep_wr.so`
-`platform/trustzone` invokes it during verified diagnostics and provisioning
-smokes (for example `protected-agent-identity-measurement-source=trustzone-ta-measure-wasm`).
+`platform/optee-common` invokes it during verified diagnostics and provisioning
+smokes (for example `protected-agent-identity-measurement-source=optee-ta-measure-wasm`).
 
 `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` is an isolated feasibility spike command. The
 default build does not link WAMR, so the expected default result is
@@ -143,9 +148,72 @@ make -C optee/twep-wr-ta
 make -C optee/twep-wr-ta TWEP_TA_WAMR_LINK=1
 ```
 
+## ARM QEMU v8 environment
+
+From the repository root, install the official OP-TEE 4.8.0 QEMU v8
+environment and its build dependencies once:
+
+```sh
+./scripts/setup_optee_arm_v8.sh --install-deps
+make check-optee-arm-v8-env
+make build-optee-trustzone
+make smoke-optee-trustzone
+```
+
+The defaults are `OPTEE_ROOT=$HOME/opt/optee` and
+`WAMR_ROOT_DIR=$HOME/opt/wasm-micro-runtime`. On an AArch64 host, both the
+normal-world client and TA use the generated Buildroot `aarch64-linux-`
+compiler; x86_64-hosted SDKs retain their generated
+`aarch64-buildroot-linux-gnu-` prefix. The Makefile detects either form. The
+repository post-runner mounts this directory at `/mnt/host`, runs `deploy.sh`,
+executes the selected guest scenario, and retains separate REE/TEE console
+logs in `build/postrun-logs`.
+
+`setup_optee_arm_v8.sh` also creates the non-system-path Go alias
+`$HOME/opt/go-optee`. The guest asset build supplies it as `GOROOT`, while C
+objects and libraries still come exclusively from the Buildroot sysroot. This
+avoids Buildroot's intentional rejection of `/usr/lib/.../runtime/cgo` without
+disabling its unsafe host-header checks.
+
 Repository entry points such as `make smoke-optee-trustzone-execute-helloworld`
 run `prepare-diagnose-smoke.sh` and then build the TA with
 `TWEP_TA_WAMR_LINK=1` automatically.
+
+## Dual-profile test policy
+
+The `smoke-optee-trustzone-*` repository targets are the historical ARM QEMU
+v8 entry points. They do not run RISC-V implicitly. For shared OP-TEE changes,
+run the baseline on both supported profiles with:
+
+```sh
+make smoke-optee-all-profiles
+```
+
+For a complete non-live run, use the repository aggregate that executes every
+offline guest scenario on both profiles:
+
+```sh
+make smoke-optee-all-profiles-offline-full
+```
+
+The RISC-V half groups the same scenarios by their required TA configuration:
+WAMR-linked normal, WAMR-unlinked, and WAMR-linked with D043 test hooks. It
+boots once per group, resets test storage between scenarios, checks kernel
+health, and restores the ordinary hook-disabled image afterward.
+
+Run the ARM and RISC-V `attestam-live`,
+`attestam-verified-acceptance`, `attestam-verified-catalog`, and
+`attestam-verified-app` targets separately. Each profile requires independently
+fresh disposable AttesTAM/Veraison state because the development Agent
+identity and service-side sequences must not leak from the first profile into
+the second. The procedure is documented in `docs/Testing.md` and
+`docs/AttesTAM.md`.
+
+The quick paired baseline is not exhaustive. The full offline aggregate is the
+canonical mapping for the current architecture-neutral focused modes; the
+static smoke checker fails if a non-live ARM mode is absent from or duplicated
+among the RISC-V groups. Single-profile coverage is acceptable only for an
+explicitly documented architecture-specific behavior.
 
 When WAMR is linked, `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` loads supplied
 `helloworld.wasm` bytes, calls `twep_app_main`, and returns raw app CBOR

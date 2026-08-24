@@ -106,8 +106,8 @@ twep_wr_status_t twep_wr_call_free(wasm_exec_env_t exec_env, wasm_module_inst_t 
 twep_wr_status_t twep_wr_run_app_wasm(const twep_wr_context_t *ctx, const twep_wr_normalized_request_t *request,
                                       twep_wr_owned_bytes_t *out_response_cbor);
 
-#ifdef TWEP_WR_PLATFORM_BACKEND_TRUSTZONE
-twep_wr_status_t twep_wr_trustzone_execute(const twep_wr_context_t *ctx, const twep_wr_normalized_request_t *request,
+#ifdef TWEP_WR_PLATFORM_BACKEND_OPTEE
+twep_wr_status_t twep_wr_optee_execute(const twep_wr_context_t *ctx, const twep_wr_normalized_request_t *request,
                                            twep_wr_owned_bytes_t *out_response_cbor);
 #endif
 

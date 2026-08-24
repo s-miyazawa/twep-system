@@ -216,6 +216,49 @@ pub(super) fn attestam_signed_update_evidence_result_cbor(
     if acceptance_generation == 0 {
         return None;
     }
+    attestam_acceptance_result_cbor(acceptance_generation)
+}
+
+pub(crate) fn linux_attestam_acceptance_observation_cbor(
+    input_cose: &[u8],
+    prior_session_token: Option<&[u8]>,
+    preceding_query_response: &[u8],
+    fresh_evidence: bool,
+) -> Option<Vec<u8>> {
+    let platform_status = platform_status_text();
+    linux_attestam_acceptance_observation_cbor_with_platform_status(
+        input_cose,
+        prior_session_token,
+        preceding_query_response,
+        fresh_evidence,
+        &platform_status,
+    )
+}
+
+pub(super) fn linux_attestam_acceptance_observation_cbor_with_platform_status(
+    input_cose: &[u8],
+    prior_session_token: Option<&[u8]>,
+    preceding_query_response: &[u8],
+    fresh_evidence: bool,
+    platform_status: &[u8],
+) -> Option<Vec<u8>> {
+    if !line_value_equals(platform_status, b"platform-backend", b"linux")
+        || !fresh_evidence
+        || preceding_query_response.is_empty()
+    {
+        return None;
+    }
+    let prior_session_token = prior_session_token?;
+    let mut state = VerificationState::default();
+    let payload = verified_attestam_update_payload(input_cose, None, &mut state)?;
+    let update_token = crate::teep::teep_message_token(&payload)?;
+    if !live_attestam_tokens_bound(prior_session_token, update_token) {
+        return None;
+    }
+    attestam_acceptance_result_cbor(0)
+}
+
+pub(super) fn attestam_acceptance_result_cbor(acceptance_generation: u64) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     if cbor::write_map(&mut out, 5).is_none()
         || cbor::write_text(&mut out, b"schema_version").is_none()

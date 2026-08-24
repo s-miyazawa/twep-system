@@ -71,7 +71,8 @@ selected by their existing fixture profiles.
 - An AttesTAM checkout
 - A Veraison deployment with the Generic EAT verification scheme enabled
 - `curl` for provisioning
-- `diag2cbor.rb` for converting the repository CoRIM fixture
+- GNU `base64` and `sha256sum` for materializing and checking the tracked
+  Generic EAT CoRIM fixture
 - For TrustZone-only validation: an OP-TEE/QEMU environment, its Buildroot
   toolchain file, and an `optee_postrun.py`-compatible runner
 
@@ -224,12 +225,14 @@ TrustZone validation additionally needs:
 
 ```sh
 export OPTEE_BUILDROOT_TOOLCHAIN=/path/to/optee/out-br/host/share/buildroot/toolchainfile.cmake
-export OPTEE_POSTRUN=/path/to/optee_postrun.py
+export OPTEE_POSTRUN="$PWD/scripts/optee_postrun.py"
 ```
 
-The runner must launch the repository's OP-TEE QEMU environment, expose the
-project to the guest, execute the requested smoke command, and return a failure
-status when expected Normal World or Secure World evidence is absent.
+The repository runner launches the official OP-TEE QEMU v8 environment,
+exposes the project to the guest, executes the requested smoke command, and
+returns a failure status when expected Normal World or Secure World evidence
+is absent. `OPTEE_POSTRUN` already defaults to this path; the export is needed
+only when invoking from a wrapper that replaces Makefile defaults.
 
 Representative targets are:
 
@@ -273,20 +276,27 @@ session's rolling tokens and exact preceding QueryResponse. All retain
 ## Validate on riscv-optee v9
 
 Place `twep-system` and `riscv-optee` beside one another and first complete the
-baseline `make smoke-optee-riscv-v9`. Keep disposable host AttesTAM and
-Veraison services running, provision the Generic EAT CoRIM, and register the
-fixture required by the selected phase. The QEMU guest reaches the host through
-`10.0.2.2` by default.
+baseline `make smoke-optee-riscv-v9`. Keep fresh disposable host AttesTAM and
+Veraison services running. Each target provisions the Generic EAT CoRIM and
+registers every fixture required by its selected phase before QEMU starts. The
+QEMU guest reaches the host through `10.0.2.2` by default.
 
 ```sh
 make smoke-optee-riscv-v9-attestam-live \
-  ATTESTAM_URL=http://10.0.2.2:8080/tam
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
+
+make smoke-optee-riscv-v9-attestam-verified-acceptance \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
 
 make smoke-optee-riscv-v9-attestam-verified-catalog \
-  ATTESTAM_URL=http://10.0.2.2:8080/tam
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
 
 make smoke-optee-riscv-v9-attestam-verified-app \
-  ATTESTAM_URL=http://10.0.2.2:8080/tam
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
 ```
 
 The Catalog target deliberately rebuilds the TA with D043 fault-injection
@@ -299,10 +309,25 @@ execution, then starts fresh host processes with an unreachable TAM and proves
 offline execution after restart. Each runner performs a clean guest poweroff so
 the v9 ext2 image is not left dirty by abrupt QEMU termination.
 
-All three targets require `final-verified=false`: the published development
+All four targets require `final-verified=false`: the published development
 keys are forgeable and OP-TEE REE FS Secure Storage on this platform does not
 claim rollback protection. A successful run validates integration and
 persistence mechanics, not production attestation assurance.
+
+## Validate live behavior on both OP-TEE profiles
+
+For shared AttesTAM/Veraison behavior, run the ARM target for the selected
+phase, stop and replace the disposable AttesTAM database and Veraison store,
+then provision/register the fixture again and run the corresponding RISC-V
+target shown above. Record both commands and results in the test report.
+
+The two runs must not share service state. Both profiles use the same fixed
+development Agent identity, while AttesTAM acceptance and component sequence
+state persist across sessions. Reusing a database can therefore make the
+second profile look previously accepted even though its protected OP-TEE state
+was reset. This would test a cross-profile state collision rather than
+equivalent fresh-device behavior. See `docs/Testing.md` for the
+complete-coverage rule and for how to report a missing profile counterpart.
 
 ## Expected behavior and troubleshooting
 

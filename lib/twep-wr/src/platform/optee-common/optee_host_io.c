@@ -1,11 +1,11 @@
 /* Copyright (c) 2026 SECOM CO., LTD. All rights reserved. */
 /* SPDX-License-Identifier: BSD-2-Clause */
-#include "trustzone_internal.h"
+#include "optee_internal.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#define TWEP_WR_TZ_HOST_IO_CAP (128u * 1024u)
+#define TWEP_WR_OPTEE_HOST_IO_CAP (128u * 1024u)
 
 static size_t cbor_len_size(uint64_t n)
 {
@@ -80,11 +80,11 @@ static void cbor_write_text_view(uint8_t **p, bytes_view_t view)
     }
 }
 
-bool twep_tz_parse_response(const uint8_t *buf,
+bool twep_optee_parse_response(const uint8_t *buf,
                                      size_t len,
-                                     twep_wr_tz_response_kind_t *out_kind,
+                                     twep_wr_optee_response_kind_t *out_kind,
                                      bytes_view_t *out_final_response,
-                                     twep_wr_tz_need_host_io_t *out_need)
+                                     twep_wr_optee_need_host_io_t *out_need)
 {
     size_t off = 0;
     uint8_t major = 0;
@@ -172,7 +172,7 @@ bool twep_tz_parse_response(const uint8_t *buf,
         return false;
     }
     if (have_final) {
-        *out_kind = TWEP_WR_TZ_RESPONSE_FINAL;
+        *out_kind = TWEP_WR_OPTEE_RESPONSE_FINAL;
         return true;
     }
     if (out_need->request_id.ptr == NULL || out_need->io_id.ptr == NULL || out_need->kind.ptr == NULL
@@ -180,11 +180,11 @@ bool twep_tz_parse_response(const uint8_t *buf,
         || out_need->normalized_input_sha256.len != 32) {
         return false;
     }
-    *out_kind = TWEP_WR_TZ_RESPONSE_NEED_HOST_IO;
+    *out_kind = TWEP_WR_OPTEE_RESPONSE_NEED_HOST_IO;
     return true;
 }
 
-static uint8_t *make_host_io_result_cbor(const twep_wr_tz_need_host_io_t *need,
+static uint8_t *make_host_io_result_cbor(const twep_wr_optee_need_host_io_t *need,
                                          const char *result_key,
                                          const uint8_t *result,
                                          size_t result_len,
@@ -231,7 +231,7 @@ static uint8_t *make_host_io_result_cbor(const twep_wr_tz_need_host_io_t *need,
     return buf;
 }
 
-uint8_t *twep_tz_make_resume_envelope(bytes_view_t request_id,
+uint8_t *twep_optee_make_resume_envelope(bytes_view_t request_id,
                                                const uint8_t *host_io_result,
                                                size_t host_io_result_len,
                                                size_t *out_len)
@@ -261,8 +261,8 @@ uint8_t *twep_tz_make_resume_envelope(bytes_view_t request_id,
     return buf;
 }
 
-twep_wr_status_t twep_tz_perform_host_io(const twep_wr_context_t *ctx,
-                                                  const twep_wr_tz_need_host_io_t *need,
+twep_wr_status_t twep_optee_perform_host_io(const twep_wr_context_t *ctx,
+                                                  const twep_wr_optee_need_host_io_t *need,
                                                   uint8_t **out_result,
                                                   size_t *out_result_len)
 {
@@ -277,7 +277,7 @@ twep_wr_status_t twep_tz_perform_host_io(const twep_wr_context_t *ctx,
     *out_result = NULL;
     *out_result_len = 0;
 
-    material = (uint8_t *)malloc(TWEP_WR_TZ_HOST_IO_CAP);
+    material = (uint8_t *)malloc(TWEP_WR_OPTEE_HOST_IO_CAP);
     if (material == NULL) {
         return TWEP_WR_ERR_NO_MEMORY;
     }
@@ -288,7 +288,7 @@ twep_wr_status_t twep_tz_perform_host_io(const twep_wr_context_t *ctx,
         }
         host_status = ctx->host_io.http_post(ctx->host_io.user_data, need->url.ptr, need->url.len,
                                              need->body.ptr, need->body.len, material,
-                                             TWEP_WR_TZ_HOST_IO_CAP, &material_len);
+                                             TWEP_WR_OPTEE_HOST_IO_CAP, &material_len);
         result_key = "response_body";
     } else if (cbor_text_view_equals(need->kind, "create_evidence")) {
         if (ctx->host_io.create_evidence == NULL || need->challenge.ptr == NULL
@@ -299,13 +299,13 @@ twep_wr_status_t twep_tz_perform_host_io(const twep_wr_context_t *ctx,
         host_status = ctx->host_io.create_evidence(ctx->host_io.user_data, need->challenge.ptr, need->challenge.len,
                                                    need->agent_public_key_cose.ptr,
                                                    need->agent_public_key_cose.len, material,
-                                                   TWEP_WR_TZ_HOST_IO_CAP, &material_len);
+                                                   TWEP_WR_OPTEE_HOST_IO_CAP, &material_len);
         result_key = "evidence";
     } else {
         free(material);
         return TWEP_WR_ERR_TEEP;
     }
-    if (material_len > TWEP_WR_TZ_HOST_IO_CAP) {
+    if (material_len > TWEP_WR_OPTEE_HOST_IO_CAP) {
         free(material);
         return TWEP_WR_ERR_TEEP;
     }

@@ -1,5 +1,56 @@
 # Testing.md: twep Test Plan
 
+`make check-optee-trustzone-smokes` also verifies the OP-TEE backend layout
+and dual-profile coverage wiring: both leaf profiles and common sources exist,
+the old `platform/trustzone` directory and selector are absent, the RISC-V
+build passes `riscv-optee` to Normal World and the TA, both paired aggregates
+invoke their ARM and RISC-V members, and every non-live ARM guest scenario is
+assigned exactly once to the equivalent RISC-V build group. ARM and RISC-V use
+distinct CMake build dirs.
+
+## OP-TEE Dual-Profile Coverage Policy
+
+`arm-optee` and `riscv-optee` are co-equal supported profiles. A test report
+may say **complete OP-TEE coverage** only when every scenario applicable to
+the change has passed on both profiles. Running only an ARM
+`smoke-optee-trustzone-*` target or only a RISC-V v9 target is useful
+profile-specific evidence, but is not complete OP-TEE coverage. The historical
+`trustzone` target name identifies the ARM QEMU v8 runner; it does not imply
+that the same scenario ran on RISC-V.
+
+Use the following profile mapping:
+
+| Scope | ARM QEMU v8 | RISC-V OP-TEE v9 | Required execution |
+| --- | --- | --- | --- |
+| Shared baseline | `make smoke-optee-trustzone` | `make smoke-optee-riscv-v9` | `make smoke-optee-all-profiles` |
+| Complete offline suite | `make smoke-optee-arm-v8-offline-full` | `make smoke-optee-riscv-v9-offline-full` | `make smoke-optee-all-profiles-offline-full` |
+| Live challenge/response | `make smoke-optee-trustzone-attestam-live ...` | `make smoke-optee-riscv-v9-attestam-live ...` | Run both separately, each with fresh service state |
+| Verified acceptance | `make smoke-optee-trustzone-attestam-verified-acceptance ...` | `make smoke-optee-riscv-v9-attestam-verified-acceptance ...` | Run both separately, each with fresh service state |
+| Verified Catalog | `make smoke-optee-trustzone-attestam-verified-catalog ...` | `make smoke-optee-riscv-v9-attestam-verified-catalog ...` | Run both separately, each with fresh service state |
+| Verified app | `make smoke-optee-trustzone-attestam-verified-app ...` | `make smoke-optee-riscv-v9-attestam-verified-app ...` | Run both separately, each with fresh service state |
+
+`make smoke-optee-all-profiles` is the required shared baseline, not an
+exhaustive replacement for the focused targets selected below. Use
+`make smoke-optee-all-profiles-offline-full` when claiming complete offline
+OP-TEE coverage. It runs all 40 non-live ARM targets and the same 40 guest
+modes on RISC-V. The RISC-V runner batches them into 28 WAMR-linked modes,
+10 WAMR-unlinked modes, and 2 D043-hook modes, resetting OP-TEE test storage
+between modes and checking kernel health before shutdown. The canonical `all`
+mode also covers the direct `default`, `diagnose`, and `provision` entries.
+The aggregate succeeds with the final marker
+`TWEP_OPTEE_ALL_PROFILES_OFFLINE_FULL_PASS` only after both profile-owned full
+suites pass.
+A genuinely architecture-specific test may be single-profile only, but the
+reason must be recorded in this file and in the test report.
+
+Live targets are intentionally not aggregated. ARM and RISC-V currently use
+the same development Agent identity, while AttesTAM acceptance and component
+sequence state persist across sessions. Reusing one service database can make
+the second profile look like an already accepted device even though its
+protected OP-TEE state was reset. Run each profile against an independently
+fresh disposable AttesTAM database and Veraison store as described in
+`docs/AttesTAM.md`, and record both results.
+
 ## KISS / DRY
 
 Follow KISS and DRY in test design. Do not duplicate fixture generation, golden data, diagnostic keys, or E2E startup procedures; refer to shared helpers or canonical data. Before adding copy-and-paste tests, consider table-driven tests that express the same boundary conditions or integration into an existing make target.
@@ -39,22 +90,74 @@ make e2e-attestam-live \
   VERAISON_PROVISION_URL=https://localhost:9443/endorsement-provisioning/v1/submit
 ```
 
+For any shared OP-TEE change, the minimum QEMU gate additionally includes:
+
+```sh
+make smoke-optee-all-profiles
+```
+
+For a full offline coverage run, replace the quick baseline with:
+
+```sh
+make smoke-optee-all-profiles-offline-full
+```
+
+Add both profile targets for every applicable live phase from the matrix
+below. Live phases are deliberately excluded from the aggregate.
+
+### ARM OP-TEE QEMU v8
+
+Prepare the pinned OP-TEE 4.8.0 QEMU v8 workspace and WAMR revision once:
+
+```sh
+./scripts/setup_optee_arm_v8.sh --install-deps
+```
+
+The script follows the OP-TEE `qemu_v8.xml` manifest, generates a revision-
+locked `~/opt/optee/pinned-manifest.xml`, builds the official AArch32 and
+AArch64 toolchains plus Buildroot SDK, enables the QEMU 9p automount, installs
+the Rust `wasm32-unknown-unknown` target, and checks out WAMR commit
+`25bd7eb63e828e4bd242cc9b38d260b4b31c6605`. Later refreshes can use
+`make setup-optee-arm-v8` without reinstalling host packages. It also exposes
+the host Go installation through the safe `${HOME}/opt/go-optee` alias so
+Buildroot's cross-compiler wrapper does not mistake Go's own `runtime/cgo`
+headers below `/usr/lib` for target headers.
+
+```sh
+make check-optee-arm-v8-env
+make build-optee-trustzone
+make smoke-optee-trustzone
+```
+
+The environment check prints the AArch64 SDK, Buildroot compiler, and QEMU
+versions and ends with `ARM_OPTEE_V8_ENV_OK`. It also verifies the client/TA
+SDK exports, boot images, WAMR revision, Rust Wasm target, and the required
+`CFG_REE_FS=y`, `CFG_RPMB_FS=n` OP-TEE configuration.
+
+The default post-runner is `scripts/optee_postrun.py`. It uses the official
+OP-TEE QEMU v8 make variables, exposes `optee/twep-wr-ta` as `/mnt/host`,
+deploys the client and TA in the guest, and validates `--expect-ree` and
+`--expect-tee` strings against separate logs. Logs are retained below
+`optee/twep-wr-ta/build/postrun-logs`. Override `OPTEE_ROOT`, `WAMR_DIR`,
+`OPTEE_BUILDROOT_TOOLCHAIN`, or `OPTEE_POSTRUN` for a different environment.
+
 `make e2e-attestam-live` is an integration test that uses real AttesTAM and Veraison instances. Include it in normal post-change verification in environments where local AttesTAM and Veraison instances can be started. If it cannot run because they are not running, an external service has failed, a port conflicts, certificate or store state is invalid, or the execution environment restricts HTTP/TLS communication, report the exact blocker and request only the service startup or access needed to run the test.
 
 For changes that compile a Rust/Wasm crate, always run `cargo clippy` in the corresponding crate. When building a Wasm target, also run clippy for the applicable target, such as `cargo clippy --target wasm32-unknown-unknown`, when appropriate.
 
 ## Verification Matrix
 
-Select post-change verification according to the scope of the change using the following criteria. `make test` is the minimum baseline and must be run for normal code changes.
+Select post-change verification according to the scope of the change using the following criteria. `make test` is the minimum baseline for normal code changes. Shared OP-TEE changes require at least `make smoke-optee-all-profiles`; a complete offline run uses `make smoke-optee-all-profiles-offline-full`. Applicable live phases must pass separately on both profiles.
 
 | Change Scope | Verification to Run | Purpose |
 | --- | --- | --- |
 | Go CLI/daemon/CBOR/IPC | `make test` | Detect regressions in unit tests and lightweight E2E helpers |
 | Normal execution path, C ABI, WAMR, Catalog, mock resolver | `make test`, `make e2e` | Confirm that `helloworld`, `calcadd`, and the JPEG version of `negaposi` remain functional on the Linux backend |
 | AttesTAM insecure, TEEP_Agent, verified dry-run, diagnostics | `make test`, `make e2e-attestam-insecure` | Verify fixture AttesTAM, the `attestam-verified` dry-run, diagnose text/JSON, and prohibition of unverified promotion |
-| Live AttesTAM/Veraison integration | `make e2e-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | Verify challenge-response, Update, Success, and app execution with real AttesTAM/Veraison instances |
-| OP-TEE scaffold, `platform/trustzone`, TA Secure Storage/random/time/CBOR dry-run smoke, WAMR-in-TA spike regression, TA production runtime migration | `make check-optee-trustzone-smokes`, `make smoke-optee-trustzone`, `make smoke-optee-trustzone-failures` as needed; for spike regressions, `make smoke-optee-trustzone-wamr-spike`, `make smoke-optee-trustzone-wamr-spike-linked`, and `make smoke-optee-trustzone-wamr-spike-negatives`; for production runtime implementation slices, `make smoke-optee-trustzone-execute-helloworld`, `make smoke-optee-trustzone-execute-calcadd`, `make smoke-optee-trustzone-execute-negaposi`, `make smoke-optee-trustzone-execute-hostcall-negative`, `make smoke-optee-trustzone-execute-cleanup-negative`, `make smoke-optee-trustzone-execute-catalog-resource-negative`, `make smoke-optee-trustzone-public-abi-resource-limit-negative`, `make smoke-optee-trustzone-teep-agent-resolve`, `make smoke-optee-trustzone-host-io-resume`, `make smoke-optee-trustzone-host-io-resume-negative`, `make smoke-optee-trustzone-teep-agent-hostcall-http`, `make smoke-optee-trustzone-teep-agent-hostcall-evidence`, `make smoke-optee-trustzone-teep-agent-hostcall-bridge`, `make smoke-optee-trustzone-teep-agent-hostcall-object-negative`, and `make smoke-optee-trustzone-teep-agent-transcript-limits`; for live compatibility, `make smoke-optee-trustzone-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | Statically verify alignment among Makefile targets, guest scenarios, and references in `docs/Testing.md`. On QEMU, verify the TEEC roundtrip, TrustZone diagnostics, protected object provisioning, TA random/time, CBOR memref command shape, failure paths, spike regressions, production WAMR execution in the TA, TEEP_Agent/Catalog resolution in the TA, rejection of general app hostcalls, host I/O resume, the TEEP_Agent hostcall broker, resource/output/cleanup boundaries, and live AttesTAM+Verifier compatibility |
-| RISC-V OP-TEE v9 port | `make build-optee-riscv-v9`, then `make smoke-optee-riscv-v9` | Cross-build every normal-world artifact and the TA for RV64 LP64D, package the v9 Buildroot image, then verify OpenSBI/Linux/OP-TEE boot, TA-local WAMR, infinite-loop termination, public ABI v3, `twepd`/`twep-cli`, and absence of kernel panic/Oops/stall diagnostics |
+| Live AttesTAM/Veraison integration | `make e2e-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...`; for OP-TEE behavior run the corresponding `smoke-optee-trustzone-attestam-*` and `smoke-optee-riscv-v9-attestam-*` targets separately, each in fresh service state | Verify Linux integration and the same applicable live protocol path on both supported OP-TEE profiles without cross-profile AttesTAM state reuse |
+| OP-TEE common/leaf split, `platform/optee-common`, `platform/arm-optee`, and `platform/riscv-optee`, TA Secure Storage/random/time/CBOR dry-run smoke, WAMR-in-TA spike regression, TA production runtime migration | `make check-optee-trustzone-smokes`, `make smoke-optee-trustzone`, `make smoke-optee-trustzone-failures` as needed; for spike regressions, `make smoke-optee-trustzone-wamr-spike`, `make smoke-optee-trustzone-wamr-spike-linked`, and `make smoke-optee-trustzone-wamr-spike-negatives`; for production runtime implementation slices, `make smoke-optee-trustzone-execute-helloworld`, `make smoke-optee-trustzone-execute-calcadd`, `make smoke-optee-trustzone-execute-negaposi`, `make smoke-optee-trustzone-execute-hostcall-negative`, `make smoke-optee-trustzone-execute-cleanup-negative`, `make smoke-optee-trustzone-execute-catalog-resource-negative`, `make smoke-optee-trustzone-public-abi-resource-limit-negative`, `make smoke-optee-trustzone-teep-agent-resolve`, `make smoke-optee-trustzone-host-io-resume`, `make smoke-optee-trustzone-host-io-resume-negative`, `make smoke-optee-trustzone-teep-agent-hostcall-http`, `make smoke-optee-trustzone-teep-agent-hostcall-evidence`, `make smoke-optee-trustzone-teep-agent-hostcall-bridge`, `make smoke-optee-trustzone-teep-agent-hostcall-object-negative`, and `make smoke-optee-trustzone-teep-agent-transcript-limits`; for live compatibility, `make smoke-optee-trustzone-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | Statically verify alignment among Makefile targets, guest scenarios, and references in `docs/Testing.md`. On QEMU, verify the TEEC roundtrip, OP-TEE diagnostics, protected object provisioning, TA random/time, CBOR memref command shape, failure paths, spike regressions, production WAMR execution in the TA, TEEP_Agent/Catalog resolution in the TA, rejection of general app hostcalls, host I/O resume, the TEEP_Agent hostcall broker, resource/output/cleanup boundaries, and live AttesTAM+Verifier compatibility |
+| OP-TEE architecture-neutral behavior or shared TA/runtime | Quick gate: `make smoke-optee-all-profiles`; complete offline gate: `make smoke-optee-all-profiles-offline-full`; then run both profile targets for every applicable live phase | Verify the shared behavior on ARM QEMU v8 and RISC-V/OpenSBI v9 rather than inferring portability from one profile |
+| RISC-V OP-TEE v9-specific port/build logic | `make build-optee-riscv-v9`, then `make smoke-optee-riscv-v9` | Cross-build every normal-world artifact and the TA for RV64 LP64D, package the v9 Buildroot image, then verify OpenSBI/Linux/OP-TEE boot, TA-local WAMR, infinite-loop termination, public ABI v3, `twepd`/`twep-cli`, and absence of kernel panic/Oops/stall diagnostics |
 | Rust/Wasm crate | `cargo test`, `cargo clippy`, and Wasm target build/clippy for the target crate | Preserve the `no_std`/Wasm ABI/hostcall boundaries |
 | docs-only | `git diff --check`, and `make test` when needed | Avoid formatting drift and broken references |
 
@@ -71,6 +174,9 @@ CMake, `expect`, `telnet`, `tmux`, and the tools required by `riscv-optee`.
 ```sh
 make build-optee-riscv-v9
 make smoke-optee-riscv-v9
+
+# All 40 non-live guest scenarios, across the required TA build variants.
+make smoke-optee-riscv-v9-offline-full
 ```
 
 Override `RISCV_OPTEE_ROOT`, `RISCV_OPTEE_BUILDROOT`,
@@ -79,6 +185,16 @@ build produces `build/riscv-optee-v9/SHA256SUMS` and updates the v9
 `buildroot/output/images/sdcard.img`. The smoke log is written to
 `build/riscv-optee-v9/qemu-smoke.log` and must end with
 `TWEP_RISCV_OPTEE_V9_SMOKE_PASS`.
+
+The full offline target rebuilds and boots three variants: WAMR-linked normal
+(`qemu-offline-normal.log`), WAMR-unlinked
+(`qemu-offline-unlinked.log`), and WAMR-linked with D043 test hooks
+(`qemu-offline-hooks.log`). Each log must end with its corresponding
+`TWEP_RISCV_OPTEE_V9_OFFLINE_*_PASS` marker. After the three groups pass, the
+target restores the ordinary WAMR-linked, hook-disabled image. Individual
+groups are available as `make smoke-optee-riscv-v9-offline-normal`,
+`make smoke-optee-riscv-v9-offline-unlinked`, and
+`make smoke-optee-riscv-v9-offline-hooks`.
 
 The test deliberately executes an infinite-loop Wasm module. It passes only
 when TA-side WAMR instruction metering terminates the module before the
@@ -112,14 +228,14 @@ This aggregate has no new guest scenario and runs the following existing targets
 
 The M10 checkpoint is a representative regression test for the production path, not a full exhaustive suite. When the relevant slice changes, additionally run the individual targets for resource/output/cleanup, wrapped errors, hash/catalog negatives, host I/O negatives, object ID negatives, and WAMR spike regressions. From D038 onward, the permanent OP-TEE configuration policy is `CFG_REE_FS=y` and `CFG_RPMB_FS=n`, and REE FS Secure Storage is treated as the secure storage for the TrustZone final path. `sealed-storage-rollback-protected=false` is diagnostic information and by itself is not grounds for `trust-anchor-bound=false` or `final-verified=false`.
 
-### TrustZone Verification Path Mapping
+### OP-TEE Verification Path Mapping
 
-`optee/twep-wr-ta/README.md` and `optee/twep-wr-ta/ARCHITECTURE.md` divide TrustZone verification into the Production public path, Direct TA smoke path, and WAMR spike path. Use the following mapping when selecting make targets.
+`optee/twep-wr-ta/README.md` and `optee/twep-wr-ta/ARCHITECTURE.md` divide OP-TEE verification into the Production public path, Direct TA smoke path, and WAMR spike path. The existing `smoke-optee-trustzone-*` target names are retained for ARM command-line compatibility. Use the following mapping when selecting make targets.
 
 | Path | Primary make Targets | Boundary Verified |
 | --- | --- | --- |
-| Production public path: `twep-cli`/`twepd` -> cgo -> `libtwep_wr.so` -> `libteec` -> TA | `make smoke-optee-trustzone-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | The user-facing path from the TrustZone backend versions of `twepd`/`twep-cli` in the guest to the TEEP_Agent in the TA, Catalog resolution, and app execution. The REE callback handles HTTP bytes; the Rust TEEP_Agent generates Generic EAT Evidence internally and keeps trust decisions in the TA |
-| Public C ABI TrustZone path: C caller -> `libtwep_wr.so` -> `libteec` -> TA | `make smoke-optee-trustzone-public-abi-wrapped-error-negative`, `make smoke-optee-trustzone-public-abi-app-hash-negative`, `make smoke-optee-trustzone-public-abi-resource-limit-negative`, `make smoke-optee-trustzone-public-abi-execute-helloworld`, `make smoke-optee-trustzone-public-abi-execute-calcadd`, `make smoke-optee-trustzone-public-abi-execute-negaposi` | Without going through `twepd`, public C ABI v3 `twep_wr_execute` marshals to the TrustZone backend and returns success/error responses as owned CBOR bytes |
+| Production public path: `twep-cli`/`twepd` -> cgo -> `libtwep_wr.so` -> `libteec` -> TA | `make smoke-optee-trustzone-attestam-live ATTESTAM_URL=... ATTESTAM_REGISTER_URL=... VERAISON_PROVISION_URL=...` | The user-facing path from the selected OP-TEE profile versions of `twepd`/`twep-cli` in the guest to the TEEP_Agent in the TA, Catalog resolution, and app execution. The REE callback handles HTTP bytes; the Rust TEEP_Agent generates Generic EAT Evidence internally and keeps trust decisions in the TA |
+| Public C ABI OP-TEE path: C caller -> `libtwep_wr.so` -> `libteec` -> TA | `make smoke-optee-trustzone-public-abi-wrapped-error-negative`, `make smoke-optee-trustzone-public-abi-app-hash-negative`, `make smoke-optee-trustzone-public-abi-resource-limit-negative`, `make smoke-optee-trustzone-public-abi-execute-helloworld`, `make smoke-optee-trustzone-public-abi-execute-calcadd`, `make smoke-optee-trustzone-public-abi-execute-negaposi` | Without going through `twepd`, public C ABI v3 `twep_wr_execute` marshals to the selected OP-TEE profile and returns success/error responses as owned CBOR bytes |
 | TA production private command path: smoke client -> `libteec` -> TA `INIT`/`EXECUTE`/`RESUME_HOST_IO` | `make smoke-optee-trustzone-execute-abi-negative`, `make smoke-optee-trustzone-execute-helloworld`, `make smoke-optee-trustzone-execute-calcadd`, `make smoke-optee-trustzone-execute-negaposi`, `make smoke-optee-trustzone-execute-hostcall-negative`, `make smoke-optee-trustzone-execute-cleanup-negative`, `make smoke-optee-trustzone-execute-catalog-resource-negative`, `make smoke-optee-trustzone-teep-agent-resolve`, `make smoke-optee-trustzone-teep-agent-signature-negative`, `make smoke-optee-trustzone-teep-agent-resolve-hash-negative`, `make smoke-optee-trustzone-teep-agent-resolve-catalog-negative`, `make smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative`, `make smoke-optee-trustzone-host-io-resume`, `make smoke-optee-trustzone-host-io-resume-negative`, `make smoke-optee-trustzone-sha256-boundary-negative`, `make smoke-optee-trustzone-teep-agent-hostcall-http`, `make smoke-optee-trustzone-teep-agent-hostcall-evidence`, `make smoke-optee-trustzone-teep-agent-hostcall-bridge`, `make smoke-optee-trustzone-teep-agent-hostcall-object-negative` | TA private command ABI, TA-local WAMR production runtime, role-specific TEEP Agent signature verification, TA-local TEEP_Agent, Catalog/app trust decisions, host I/O resume, rejection of general app hostcalls, and resource/output/cleanup boundaries |
 | Direct TA smoke path: `optee_example_twep_wr_ta` -> `libteec` -> TA smoke commands | `make smoke-optee-trustzone`, `make smoke-optee-trustzone-failures` | TEEC session, TA command dispatch, Secure Storage PUT/GET, random/time, CBOR dry-run, diagnostics, and protected object provisioning/failure. This is not the public `twepd` path |
 | WAMR spike path: `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` | `make smoke-optee-trustzone-wamr-spike`, `make smoke-optee-trustzone-wamr-spike-linked`, `make smoke-optee-trustzone-wamr-spike-linked-negative`, `make smoke-optee-trustzone-wamr-spike-input-negative`, `make smoke-optee-trustzone-wamr-spike-output-negative`, `make smoke-optee-trustzone-wamr-spike-cleanup-negative`, `make smoke-optee-trustzone-wamr-spike-negatives` | Historical WAMR-in-TA feasibility spike and negative regressions. This is a separate path from Catalog resolution, TEEP_Agent, `calcadd`, `negaposi`, host I/O resume, and public `twep_wr_execute` |
@@ -158,7 +274,7 @@ The current `make smoke-optee-trustzone-teep-agent-resolve` slice is the minimum
 
 `make smoke-optee-trustzone-teep-agent-hostcall-object-negative` passes invalid object IDs from diagnostic commands in `teep-agent.wasm` running under WAMR inside the TA to the `read_file`/`write_file` hostcalls and verifies that the TA rejects arbitrary paths and unauthorized object IDs. It also invokes the public REE Secure Storage GET and PUT commands directly. The target must prove that neither surface can publish `verified-evidence-result.cbor` or overwrite the D043 state, that no generic path can write the logical Catalog or directly read/write either physical D047 slot, and that public REE GET cannot read the logical Catalog. The dedicated D043 and Catalog commit hostcalls are the sole live publication boundaries; the TEEP_Agent's permitted `read_file("catalog/catalog.cbor")` resolves only the D043-selected active protected Catalog. In the current slice, ordinary probe object IDs are limited to `catalog/catalog.cbor`, `apps/helloworld.wasm`, and `tmp/teep-agent-probe`. Malformed/current/stale acceptance-state diagnostics use the compile-guarded M9.1H test interface; production GET/PUT never becomes a D043 or D047 bypass.
 
-`make smoke-optee-trustzone-attestam-live` provisions the Veraison Generic EAT CoRIM fixture and registers the `helloworld` SUIT manifest with AttesTAM on the host, then runs the TrustZone backend versions of `twepd`/`twep-cli` in the QEMU guest. The default URL for reaching host AttesTAM from the guest is `http://10.0.2.2:8080/tam`. Because `prepare-diagnose-smoke.sh` copies the same host build artifacts, `build/teep-agent.wasm`, `build/helloworld.wasm`, `build/calcadd.wasm`, and `build/negaposi.wasm`, into guest input, record `sha256sum build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm build/negaposi.wasm` before or after Linux-live and TrustZone-live compatibility verification. This existing target intentionally uses `attestam-insecure`, so it must expect `trust-anchor-bound=false` and `final-verified=false` even after success.
+`make smoke-optee-trustzone-attestam-live` provisions the Veraison Generic EAT CoRIM fixture and registers the `helloworld` SUIT manifest with AttesTAM on the host, then runs the selected OP-TEE profile versions of `twepd`/`twep-cli` in the QEMU guest. The checked-in CoRIM payload is decoded with GNU `base64` and verified by SHA-256, so running the live targets does not depend on a separately installed Ruby `diag2cbor.rb`. The default URL for reaching host AttesTAM from the guest is `http://10.0.2.2:8080/tam`. Because `prepare-diagnose-smoke.sh` copies the same host build artifacts, `build/teep-agent.wasm`, `build/helloworld.wasm`, `build/calcadd.wasm`, and `build/negaposi.wasm`, into guest input, record `sha256sum build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm build/negaposi.wasm` before or after Linux-live and OP-TEE-live compatibility verification. This existing target intentionally uses `attestam-insecure`, so it must expect `trust-anchor-bound=false` and `final-verified=false` even after success.
 
 `make smoke-optee-trustzone-attestam-verified-acceptance` is the positive acceptance-only target. It builds and signs `build/teep-agent-m9-1-smoke.wasm` with the private Cargo feature `m9-1-acceptance-only-smoke`; this artifact exists only to reproduce the historical M9.1 boundary, while the default `build/teep-agent.wasm` implements M9.3. With real host AttesTAM and Veraison, the target runs TrustZone `attestam-verified` using the fixed D045 development signers, requires a TAM-signed app Update from the live Evidence challenge-response, verifies that D043 is current after a single commit, and then expects `teep.verified_required`. It must also prove that Success, staged payload, Catalog/app files, and application execution remain absent and that `final-verified=false`. This target does not substitute for Catalog or application installation tests and the smoke-only artifact must not be deployed as the production/default TEEP Agent.
 
@@ -166,13 +282,13 @@ The current `make smoke-optee-trustzone-teep-agent-resolve` slice is the minimum
 
 `make smoke-optee-trustzone-attestam-verified-app` is the M9.3 live academic-reference target. With real host AttesTAM and Veraison, it registers the default Catalog containing the standard app entries and the `helloworld` app TC. The first invocation protects the Catalog and returns `teep.verified_required`; the second obtains, authorizes, protects, reloads, and executes `helloworld`. The current AttesTAM normally recognizes the already accepted agent in that second session and returns the app Update directly after the component-list QueryResponse, so the test also verifies reuse of the current protected acceptance generation with fresh session tokens and transcript binding. A third invocation starts fresh host processes with an unreachable TAM URL and proves that the protected Catalog and app can execute offline. It also verifies that no REE Catalog or app mirror was created and that diagnostics retain `final-verified=false`. Use a fresh disposable AttesTAM database because component sequence freshness is persistent.
 
-The RISC-V v9 equivalents are `make smoke-optee-riscv-v9-attestam-live`, `make smoke-optee-riscv-v9-attestam-verified-catalog`, and `make smoke-optee-riscv-v9-attestam-verified-app`. They run the same guest smoke modes against host AttesTAM/Veraison through `ATTESTAM_URL` (normally `http://10.0.2.2:8080/tam`), check the Linux kernel for panic/Oops/stall signatures, and power off QEMU cleanly. The Catalog target cross-builds with `TWEP_TA_D043_TEST_HOOKS=1`; the normal build and app target default it back to zero. Registration and CoRIM provisioning remain explicit prerequisites so test databases and component sequences cannot be silently reused.
+The RISC-V v9 equivalents are `make smoke-optee-riscv-v9-attestam-live`, `make smoke-optee-riscv-v9-attestam-verified-acceptance`, `make smoke-optee-riscv-v9-attestam-verified-catalog`, and `make smoke-optee-riscv-v9-attestam-verified-app`. They provision the CoRIM and register the phase-specific fixtures on the host, then run the same guest smoke modes against AttesTAM/Veraison through `ATTESTAM_URL` (normally `http://10.0.2.2:8080/tam`), check the Linux kernel for panic/Oops/stall signatures, and power off QEMU cleanly. The app target registers both the application-bearing Catalog and `helloworld`; omitting either is a test setup error. The acceptance target packages the same signed `build/teep-agent-m9-1-smoke.wasm` used by ARM. The Catalog target cross-builds with `TWEP_TA_D043_TEST_HOOKS=1`; the other live targets use the ordinary hook-disabled build. A fresh disposable AttesTAM database and Veraison store remain service-level prerequisites so component sequences cannot be silently reused.
 
 For live Generic EAT, QueryResponse option 12 must identify `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`. The compatible AttesTAM Veraison client derives the new-session nonce from the submitted Evidence. Unit coverage must reject regressions to a fixed Veraison nonce while preserving the historical fallback only for evidence formats whose claims AttesTAM cannot decode locally.
 
 For D046, unit tests and the live target must distinguish two contracts. Fixed-input Linux dry-run fixtures require the expected token file to byte-match the Update token. The live AttesTAM path requires a non-empty bounded initial QueryRequest token and a non-empty bounded immediate-Update token, permits them to differ, and relies on the ordered continuation plus the exact D043-consumed Evidence QueryResponse transcript for session binding. Empty or oversized tokens, an Update outside the Evidence continuation, a missing pending transcript, or a failed D043 commit must not publish a positive result.
 
-In TrustZone production diagnostics, expect `runtime-location=trustzone-ta`, `teep-agent-location=trustzone-ta`, and `catalog-resolution-location=trustzone-ta` only on paths moved to TA execution. However, OP-TEE Secure Storage smoke, random/time smoke, CBOR dry-run, the WAMR spike, and successful TA-local production WAMR execution must never individually serve as grounds for trust-anchor binding. Every TrustZone smoke test retains `sealed-storage-security=tee-ree-fs-secure-storage` and `sealed-storage-rollback-protected=false`. The latter is diagnostic information, not a blocker.
+In OP-TEE production diagnostics, expect `runtime-location=optee-ta`, `teep-agent-location=optee-ta`, and `catalog-resolution-location=optee-ta` only on paths moved to TA execution. However, OP-TEE Secure Storage smoke, random/time smoke, CBOR dry-run, the WAMR spike, and successful TA-local production WAMR execution must never individually serve as grounds for trust-anchor binding. Every OP-TEE profile smoke test retains `sealed-storage-security=tee-ree-fs-secure-storage` and `sealed-storage-rollback-protected=false`. The latter is diagnostic information, not a blocker.
 For successful TrustZone smoke tests, no-kid diagnostics provisioned with only protected objects expect `protected-credential-store-issuer-allowlist-match=false`, `protected-store-freshness-epoch-match=true`, and `protected-revocation-state-match=true`; without an observed matching AttesTAM `kid`, the credential store and issuer allowlist remain unbound. Under the implemented D038 policy, matched policy objects on TrustZone REE FS Secure Storage can advance to `bound`, while the Linux backend remains observation-only. Subsequent diagnostics with verified input expect `protected-credential-store-attestam-key-binding=observed-kid-entry-protected-storage-bound` and `protected-credential-store-bound=true` when the observed AttesTAM `kid` matches a protected credential store entry. A matching issuer allowlist additionally yields `protected-credential-store-issuer-allowlist-match=true`, `protected-store-freshness-epoch-match=true`, `protected-revocation-state-match=true`, and `issuer-allowlist-bound=true`. These individual bindings are necessary but not sufficient for final verification; the live TAM-signed Update, current D043 acceptance generation, and TEEP_Agent identity must also bind in the formal verified session.
 In the same TrustZone smoke test, when the observed AttesTAM `kid` matches a protected credential store entry but that entry's `issuer_id` is absent from the issuer allowlist, expect `protected-credential-store-attestam-key-binding=observed-kid-entry-protected-storage-bound`, `protected-credential-store-issuer-allowlist-match=false`, `protected-credential-store-bound=true`, and `issuer-allowlist-bound=false`. This verifies credential selection and issuer-policy binding as separate conditions.
 
@@ -412,7 +528,7 @@ Store the following in `testdata/catalog/`.
 
 ## CI Policy
 
-The following is sufficient for the initial CI.
+The following remains the lightweight, architecture-independent CI gate.
 
 ```sh
 make fmt
@@ -421,6 +537,15 @@ make test
 ```
 
 If WAMR builds are expensive, add separate CI targets for C ABI smoke tests and WAMR integration tests.
+
+A CI or release job described as full OP-TEE coverage must have access to both
+QEMU environments and run `make smoke-optee-all-profiles-offline-full`. Live
+protocol changes must additionally run the corresponding ARM and RISC-V
+AttesTAM/Veraison targets separately in independently fresh disposable service
+state. A skipped profile or applicable live phase is reported as incomplete,
+not silently converted to a passing full-coverage job. The shorter
+`make smoke-optee-all-profiles` remains suitable for a quick presubmit gate but
+is not a full-coverage result.
 
 ## Test Report Format
 
@@ -434,8 +559,14 @@ Executed:
 - make e2e: pass/fail/not run
 - make e2e-attestam-insecure: pass/fail/not run
 - make e2e-attestam-live: pass/fail/not run
+- ARM OP-TEE QEMU v8 scenarios: pass/fail/not run (list targets)
+- RISC-V OP-TEE v9 scenarios: pass/fail/not run (list targets)
+- Full offline aggregate (`make smoke-optee-all-profiles-offline-full`): pass/fail/not run
+- Live OP-TEE phases: pass/fail/not run (list ARM/RISC-V pairs and service-state reset)
+- OP-TEE dual-profile coverage: complete/incomplete/not applicable
 
 Reason not run:
+Coverage gaps and profile-specific exceptions:
 Failure details:
 Remediation plan:
 ```

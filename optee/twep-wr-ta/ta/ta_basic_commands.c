@@ -6,7 +6,7 @@
 #include <tee_internal_api_extensions.h>
 
 #define PLATFORM_STATUS \
-	"platform-backend=trustzone\n" \
+	"platform-backend=" TWEP_TA_PLATFORM_BACKEND "\n" \
 	"sealed-storage-security=tee-ree-fs-secure-storage\n" \
 	"sealed-storage-rollback-protected=false\n" \
 	"protected-storage=true\n" \

@@ -2642,7 +2642,7 @@ func TestAttestamInsecureAlternateAgentKeyObservesChallengeAfterToken(t *testing
 	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "last-attestation-query-response-body.cose"))
 }
 
-func TestAttestamInsecureChallengeBoundUpdateDoesNotWriteVerifiedObservation(t *testing.T) {
+func TestAttestamInsecureChallengeBoundSignedUpdateWritesLinuxObservation(t *testing.T) {
 	command := "helloworld"
 	appPayload := readFileBytes(t, filepath.Join("..", "..", "build", "helloworld.wasm"))
 	updateToken := []byte{0xca, 0xfe, 0xba, 0xbe}
@@ -2743,7 +2743,10 @@ func TestAttestamInsecureChallengeBoundUpdateDoesNotWriteVerifiedObservation(t *
 	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "verified-input-payload.cbor"))
 	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "suit-auth-status.txt"))
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "update-manifest-sequence-number.txt"), []byte("sequence-number=4\n"))
-	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "verified-evidence-result.cbor"))
+	assertAttestamSignedUpdateEvidenceResult(
+		t,
+		filepath.Join(stateDir, "teep-agent", "verified-evidence-result.cbor"),
+	)
 	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "verified-state.txt"))
 	assertFileBytes(t, filepath.Join(stateDir, "apps", "helloworld.wasm"), appPayload)
 }

@@ -29,6 +29,11 @@ internal pointers, Wasm memory pointers, or native runtime handles.
 - `src/platform/`: backend-specific file, random, time, and protected-storage
   primitives.
 
+OP-TEE is selected explicitly as `arm-optee` or `riscv-optee`. Both choices
+compile `src/platform/optee-common/` plus one minimal descriptor from
+`src/platform/<profile>/`. The former ambiguous `platform/trustzone` backend
+no longer exists, and CMake rejects a profile whose target CPU does not match.
+
 ## Security Boundary Notes
 
 General Trusted Wasm Apps receive no native hostcalls.

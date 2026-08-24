@@ -190,12 +190,31 @@ fn handle_session_response(
 
     if body_type == TEEP_TYPE_UPDATE {
         return match context.policy {
-            SessionPolicy::InsecureInstall => process_update_payload(
-                context.out_desc_ptr,
-                context.attestam_url,
-                context.requested_component_id,
-                &body_payload,
-            ),
+            SessionPolicy::InsecureInstall => {
+                let acceptance_observation = verified::linux_attestam_acceptance_observation_cbor(
+                    body,
+                    context.session_token,
+                    preceding_query_response,
+                    fresh_evidence,
+                );
+                let result = process_update_payload(
+                    context.out_desc_ptr,
+                    context.attestam_url,
+                    context.requested_component_id,
+                    &body_payload,
+                );
+                if result.is_ok() {
+                    if let Some(observation) = acceptance_observation {
+                        if !host_io::write_file(
+                            evidence::VERIFIED_EVIDENCE_RESULT_PATH,
+                            &observation,
+                        ) {
+                            return Err(127);
+                        }
+                    }
+                }
+                result
+            }
             SessionPolicy::VerifiedPocAcceptanceOnly => {
                 if !fresh_evidence && !verified::protected_attestam_acceptance_is_current() {
                     return Err(write_output(

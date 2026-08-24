@@ -119,7 +119,7 @@ pub extern "C" fn twep_app_main(input_ptr: u32, input_len: u32, out_desc_ptr: u3
     let resolver_mode = cbor::text_field(&input_value, RESOLVER_MODE_KEY).unwrap_or_default();
     if resolver_mode == b"attestam-verified" {
         let attestam_url = cbor::text_field(&input_value, ATTESTAM_URL_KEY).unwrap_or_default();
-        if !attestam_url.is_empty() && verified::trustzone_live_poc_acceptance_supported() {
+        if !attestam_url.is_empty() && verified::optee_live_poc_acceptance_supported() {
             return session::run_verified_poc_resolve(
                 out_desc_ptr,
                 target_command,

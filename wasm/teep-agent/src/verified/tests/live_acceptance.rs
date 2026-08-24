@@ -26,6 +26,108 @@ fn live_attestam_update_payload_requires_tam_signature() {
 }
 
 #[test]
+fn linux_live_attestam_signed_update_records_generation_zero_observation() {
+    let update_token = b"update-token";
+    let (update_payload, _component_id, _payload_sha256) =
+        crate::suit::fixture_test_update_payload_with_suit_auth(
+            b"remotehello",
+            b"wasm bytes",
+            b"wasm bytes",
+            update_token,
+        );
+    let signed_update =
+        crate::cose::sign_test_update(&update_payload, crate::cose::TestCoseSigner::Tam)
+            .expect("signed update");
+    let linux_platform = b"platform-backend=linux\nsealed-storage-security=observation-only\n";
+
+    let result = linux_attestam_acceptance_observation_cbor_with_platform_status(
+        &signed_update,
+        Some(b"query-request-token"),
+        b"evidence-bearing query response",
+        true,
+        linux_platform,
+    )
+    .expect("Linux acceptance observation");
+    let expected = attestam_acceptance_result_cbor(0).expect("generation zero observation");
+    assert_eq!(result, expected);
+
+    let status = evidence_status_from_cbor(&result, EvidenceSource::ReeStateFile);
+    assert_eq!(status.load_status, EvidenceLoadStatus::Unsupported);
+    assert!(!status.acceptance_generation_current);
+    assert!(!status.affirming_ready(linux_platform));
+}
+
+#[test]
+fn linux_live_attestam_observation_requires_signed_immediate_evidence_response() {
+    let update_token = b"update-token";
+    let (update_payload, _component_id, _payload_sha256) =
+        crate::suit::fixture_test_update_payload_with_suit_auth(
+            b"remotehello",
+            b"wasm bytes",
+            b"wasm bytes",
+            update_token,
+        );
+    let signed_update =
+        crate::cose::sign_test_update(&update_payload, crate::cose::TestCoseSigner::Tam)
+            .expect("signed update");
+    let wrong_signer =
+        crate::cose::sign_test_update(&update_payload, crate::cose::TestCoseSigner::Agent)
+            .expect("signed update");
+    let linux_platform = b"platform-backend=linux\nsealed-storage-security=observation-only\n";
+    let optee_platform =
+        b"platform-backend=arm-optee\nsealed-storage-security=tee-ree-fs-secure-storage\n";
+
+    for (input, prior_token, preceding_response, fresh_evidence, platform_status) in [
+        (
+            wrong_signer.as_slice(),
+            Some(b"query-request-token".as_slice()),
+            b"evidence-bearing query response".as_slice(),
+            true,
+            linux_platform.as_slice(),
+        ),
+        (
+            signed_update.as_slice(),
+            None,
+            b"evidence-bearing query response".as_slice(),
+            true,
+            linux_platform.as_slice(),
+        ),
+        (
+            signed_update.as_slice(),
+            Some(b"query-request-token".as_slice()),
+            b"".as_slice(),
+            true,
+            linux_platform.as_slice(),
+        ),
+        (
+            signed_update.as_slice(),
+            Some(b"query-request-token".as_slice()),
+            b"evidence-bearing query response".as_slice(),
+            false,
+            linux_platform.as_slice(),
+        ),
+        (
+            signed_update.as_slice(),
+            Some(b"query-request-token".as_slice()),
+            b"evidence-bearing query response".as_slice(),
+            true,
+            optee_platform.as_slice(),
+        ),
+    ] {
+        assert!(
+            linux_attestam_acceptance_observation_cbor_with_platform_status(
+                input,
+                prior_token,
+                preceding_response,
+                fresh_evidence,
+                platform_status,
+            )
+            .is_none()
+        );
+    }
+}
+
+#[test]
 fn live_attestam_signed_update_commits_positive_v2_result_after_tam_signature() {
     let query_response = b"tagged evidence query response";
     let update_token = b"\x01\x02\x03";

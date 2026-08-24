@@ -61,7 +61,7 @@ fn evidence_status_reports_legacy_matches_unbound_when_partial() {
         acceptance_generation_current: false,
     };
     let platform_status =
-        b"platform-backend=trustzone\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
+        b"platform-backend=trustzone\nruntime-location=trustzone-ta\nteep-agent-location=trustzone-ta\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
     assert_eq!(
         status.binding_text(platform_status),
         b"matched-unbound".as_slice()
@@ -95,7 +95,7 @@ fn evidence_status_from_cbor_keeps_legacy_result_non_final() {
     cbor::write_bool(&mut input, true).unwrap();
 
     let platform_status =
-        b"platform-backend=trustzone\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
+        b"platform-backend=trustzone\nruntime-location=trustzone-ta\nteep-agent-location=trustzone-ta\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
 
     let file_status = evidence_status_from_cbor(&input, EvidenceSource::ReeStateFile);
     assert_eq!(
@@ -115,7 +115,7 @@ fn evidence_status_from_cbor_keeps_legacy_result_non_final() {
 #[test]
 fn attestam_evidence_result_v2_requires_verified_response_and_transcript() {
     let platform_status =
-        b"platform-backend=trustzone\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
+        b"platform-backend=trustzone\nruntime-location=trustzone-ta\nteep-agent-location=trustzone-ta\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
     let mut input = Vec::new();
     cbor::write_map(&mut input, 5).unwrap();
     cbor::write_text(&mut input, b"schema_version").unwrap();
@@ -158,7 +158,7 @@ fn attestam_evidence_result_binds_only_current_commit_generation() {
     let generation = 0x1_0000_0001;
     let input = attestam_signed_update_evidence_result_cbor(generation).expect("evidence cbor");
     let platform_status =
-        b"platform-backend=trustzone\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
+        b"platform-backend=trustzone\nruntime-location=trustzone-ta\nteep-agent-location=trustzone-ta\nsealed-storage-security=tee-ree-fs-secure-storage\nsealed-storage-rollback-protected=false\n";
 
     let current = evidence_status_from_cbor_with_generation(
         &input,

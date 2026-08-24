@@ -64,10 +64,11 @@ pub(super) fn agent_identity_status_text(
     platform_status: &[u8],
     protected_agent_identity: &AgentIdentityStatus,
 ) -> Vec<u8> {
-    let is_trustzone = line_value_equals(platform_status, b"platform-backend", b"trustzone");
+    let optee = optee_profile(platform_status);
+    let optee_backend = optee_backend_name(platform_status);
     let is_linux = line_value_equals(platform_status, b"platform-backend", b"linux");
-    let ta_runtime = line_value_equals(platform_status, b"runtime-location", b"trustzone-ta");
-    let ta_agent = line_value_equals(platform_status, b"teep-agent-location", b"trustzone-ta");
+    let ta_runtime = optee.is_some();
+    let ta_agent = optee.is_some();
     let rollback_false = line_value_equals(
         platform_status,
         b"sealed-storage-rollback-protected",
@@ -78,12 +79,12 @@ pub(super) fn agent_identity_status_text(
         b"sealed-storage-rollback-protected",
         b"true",
     );
-    let agent_observed = is_linux || (is_trustzone && ta_runtime && ta_agent);
+    let agent_observed = is_linux || optee.is_some();
 
     let mut out = Vec::new();
     out.extend_from_slice(b"agent-identity-model-ready=true\nplatform-backend=");
-    if is_trustzone {
-        out.extend_from_slice(b"trustzone");
+    if let Some(backend) = optee_backend {
+        out.extend_from_slice(backend);
     } else if is_linux {
         out.extend_from_slice(b"linux");
     } else {
@@ -91,13 +92,13 @@ pub(super) fn agent_identity_status_text(
     }
     out.extend_from_slice(b"\nruntime-location=");
     if ta_runtime {
-        out.extend_from_slice(b"trustzone-ta");
+        out.extend_from_slice(optee.unwrap().1);
     } else {
         out.extend_from_slice(b"unknown");
     }
     out.extend_from_slice(b"\nteep-agent-location=");
     if ta_agent {
-        out.extend_from_slice(b"trustzone-ta");
+        out.extend_from_slice(optee.unwrap().1);
     } else {
         out.extend_from_slice(b"unknown");
     }
@@ -110,7 +111,7 @@ pub(super) fn agent_identity_status_text(
         out.extend_from_slice(b"unknown");
     }
     out.extend_from_slice(b"\nagent-identity-source=");
-    if is_trustzone && ta_runtime && ta_agent {
+    if optee.is_some() {
         out.extend_from_slice(b"platform-status-ta-local");
     } else if is_linux {
         out.extend_from_slice(b"platform-status-linux");

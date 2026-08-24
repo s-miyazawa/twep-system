@@ -1,6 +1,6 @@
 /* Copyright (c) 2026 SECOM CO., LTD. All rights reserved. */
 /* SPDX-License-Identifier: BSD-2-Clause */
-#include "trustzone_internal.h"
+#include "optee_internal.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -17,11 +17,11 @@ static bool cbor_text_view_equals(bytes_view_t view, const char *text)
     size_t text_len = strlen(text);
     return view.len == text_len && memcmp(view.ptr, text, text_len) == 0;
 }
-static bool trustzone_measure_wasm(const uint8_t *wasm,
+static bool optee_measure_wasm(const uint8_t *wasm,
                                    size_t wasm_len,
                                    uint8_t out_sha256[SHA256_DIGEST_LENGTH])
 {
-    twep_tz_session_t session;
+    twep_optee_session_t session;
     twep_wr_platform_status_t status;
     TEEC_Operation op;
     TEEC_Result res;
@@ -30,7 +30,7 @@ static bool trustzone_measure_wasm(const uint8_t *wasm,
     if (wasm == NULL || wasm_len == 0 || out_sha256 == NULL) {
         return false;
     }
-    status = twep_tz_open(&session);
+    status = twep_optee_open(&session);
     if (status != TWEP_WR_PLATFORM_OK) {
         return false;
     }
@@ -45,12 +45,12 @@ static bool trustzone_measure_wasm(const uint8_t *wasm,
 
     res = TEEC_InvokeCommand(&session.sess, TA_TWEP_WR_CMD_MEASURE_WASM,
                              &op, &origin);
-    twep_tz_close(&session);
+    twep_optee_close(&session);
     return res == TEEC_SUCCESS &&
            op.params[1].tmpref.size == SHA256_DIGEST_LENGTH;
 }
 
-static const char *trustzone_protected_object_load_status(const char *object_name,
+static const char *optee_protected_object_load_status(const char *object_name,
                                                           uint8_t **out,
                                                           size_t *out_len)
 {
@@ -300,7 +300,7 @@ static bool cbor_map_bytes_array_contains(const uint8_t *buf, size_t len,
                 if (!twep_wr_cbor_read_bytes_view(buf, len, &off, &value)) {
                     return false;
                 }
-                if (twep_tz_bytes_view_equals(value, expected, expected_len)) {
+                if (twep_optee_bytes_view_equals(value, expected, expected_len)) {
                     return true;
                 }
             }
@@ -352,7 +352,7 @@ static bool validate_protected_public_key_credential(const uint8_t *buf,
         return false;
     }
     if (entry_id != NULL && entry_id_len != 0u &&
-        !twep_tz_bytes_view_equals(entry, entry_id, entry_id_len)) {
+        !twep_optee_bytes_view_equals(entry, entry_id, entry_id_len)) {
         return false;
     }
     if (issuer_id != NULL) {
@@ -373,7 +373,7 @@ typedef struct {
     uint32_t selected_provisioning_epoch;
     bytes_view_t selected_issuer_id;
     bytes_view_t selected_kid;
-} twep_wr_tz_credential_array_info_t;
+} twep_wr_optee_credential_array_info_t;
 
 static bool cbor_map_credential_array_valid(const uint8_t *buf,
                                             size_t len,
@@ -381,7 +381,7 @@ static bool cbor_map_credential_array_valid(const uint8_t *buf,
                                             const char *purpose,
                                             const uint8_t *entry_id,
                                             size_t entry_id_len,
-                                            twep_wr_tz_credential_array_info_t *out_info)
+                                            twep_wr_optee_credential_array_info_t *out_info)
 {
     size_t off = 0;
     uint8_t major = 0;
@@ -438,7 +438,7 @@ static bool cbor_map_credential_array_valid(const uint8_t *buf,
                                           "entry_id", &entry)) {
                     return false;
                 }
-                if (!twep_tz_bytes_view_equals(entry, entry_id, entry_id_len)) {
+                if (!twep_optee_bytes_view_equals(entry, entry_id, entry_id_len)) {
                     continue;
                 }
                 found_match = true;
@@ -475,8 +475,8 @@ static bool validate_protected_credential_store(const uint8_t *buf,
     static const uint8_t suit_entry_id[] = {'s', 'u', 'i', 't', '-', 'e', 'n', 't', 'r', 'y'};
     uint32_t schema_version = 0;
     uint32_t epoch = 0;
-    twep_wr_tz_credential_array_info_t attestam_info;
-    twep_wr_tz_credential_array_info_t suit_info;
+    twep_wr_optee_credential_array_info_t attestam_info;
+    twep_wr_optee_credential_array_info_t suit_info;
 
     memset(&attestam_info, 0, sizeof(attestam_info));
     memset(&suit_info, 0, sizeof(suit_info));
@@ -683,7 +683,7 @@ static bool validate_verified_evidence_result(const uint8_t *buf,
            cbor_map_optional_bool_field(buf, len, "platform_match", NULL, platform_match);
 }
 
-static bool trustzone_acceptance_slot_generation(const char *object_name,
+static bool optee_acceptance_slot_generation(const char *object_name,
                                                  uint64_t *generation)
 {
     uint8_t *slot = NULL;
@@ -695,7 +695,7 @@ static bool trustzone_acceptance_slot_generation(const char *object_name,
     if (object_name == NULL || generation == NULL) {
         return false;
     }
-    load_status = trustzone_protected_object_load_status(object_name, &slot, &slot_len);
+    load_status = optee_protected_object_load_status(object_name, &slot, &slot_len);
     if (strcmp(load_status, "loaded-unbound") != 0) {
         free(slot);
         return false;
@@ -715,7 +715,7 @@ static bool trustzone_acceptance_slot_generation(const char *object_name,
     return true;
 }
 
-static bool trustzone_acceptance_slot_generation_bytes(const uint8_t *slot,
+static bool optee_acceptance_slot_generation_bytes(const uint8_t *slot,
                                                        size_t slot_len,
                                                        uint64_t *generation)
 {
@@ -734,7 +734,7 @@ static bool trustzone_acceptance_slot_generation_bytes(const uint8_t *slot,
     return true;
 }
 
-static bool trustzone_acceptance_generation(uint64_t *generation)
+static bool optee_acceptance_generation(uint64_t *generation)
 {
     uint64_t slot_generation = 0;
     bool found = false;
@@ -743,11 +743,11 @@ static bool trustzone_acceptance_generation(uint64_t *generation)
         return false;
     }
     *generation = 0;
-    if (trustzone_acceptance_slot_generation("teep-acceptance-state.0.cbor", &slot_generation)) {
+    if (optee_acceptance_slot_generation("teep-acceptance-state.0.cbor", &slot_generation)) {
         *generation = slot_generation;
         found = true;
     }
-    if (trustzone_acceptance_slot_generation("teep-acceptance-state.1.cbor", &slot_generation) &&
+    if (optee_acceptance_slot_generation("teep-acceptance-state.1.cbor", &slot_generation) &&
         (!found || slot_generation > *generation)) {
         *generation = slot_generation;
         found = true;
@@ -797,13 +797,14 @@ static bool validate_protected_agent_identity(const uint8_t *buf,
         return false;
     }
     if (backend_match != NULL) {
-        *backend_match = cbor_text_view_equals(platform_backend, "trustzone");
+        *backend_match = cbor_text_view_equals(
+            platform_backend, twep_wr_platform_info()->backend_name);
     }
     if (runtime_match != NULL && runtime_location_present) {
-        *runtime_match = cbor_text_view_equals(runtime_location, "trustzone-ta");
+        *runtime_match = cbor_text_view_equals(runtime_location, "optee-ta");
     }
     if (teep_agent_match != NULL && teep_agent_location_present) {
-        *teep_agent_match = cbor_text_view_equals(teep_agent_location, "trustzone-ta");
+        *teep_agent_match = cbor_text_view_equals(teep_agent_location, "optee-ta");
     }
     if (measurement != NULL && measurement_present) {
         *measurement = measurement_sha256;
@@ -1018,19 +1019,10 @@ static bool cbor_map_optional_bytes_field(const uint8_t *buf, size_t len,
     return true;
 }
 
-void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
+void twep_optee_write_verified_diagnostics(const twep_wr_context_t *ctx)
 {
-    static const uint8_t platform_status[] =
-        "platform-backend=trustzone\n"
-        "runtime-location=trustzone-ta\n"
-        "teep-agent-location=trustzone-ta\n"
-        "catalog-resolution-location=trustzone-ta\n"
-        "sealed-storage-security=tee-ree-fs-secure-storage\n"
-        "sealed-storage-rollback-protected=false\n"
-        "protected-storage-supported=true\n"
-        "file-io=false\n"
-        "random=true\n"
-        "time=true\n";
+    uint8_t platform_status[512];
+    int platform_status_len;
     uint8_t *protected_store = NULL;
     uint8_t *issuer_allowlist = NULL;
     uint8_t *store_freshness = NULL;
@@ -1108,26 +1100,39 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
     char agent_identity_status[1024];
     char path[TWEP_WR_MAX_PATH_LEN];
 
+    platform_status_len = snprintf((char *)platform_status, sizeof(platform_status),
+                                   "platform-backend=%s\n"
+                                   "runtime-location=optee-ta\n"
+                                   "teep-agent-location=optee-ta\n"
+                                   "catalog-resolution-location=optee-ta\n"
+                                   "sealed-storage-security=tee-ree-fs-secure-storage\n"
+                                   "sealed-storage-rollback-protected=false\n"
+                                   "protected-storage-supported=true\n"
+                                   "file-io=false\nrandom=true\ntime=true\n",
+                                   twep_wr_platform_info()->backend_name);
+    if (platform_status_len < 0 || (size_t)platform_status_len >= sizeof(platform_status)) {
+        return;
+    }
     if (ctx == NULL || ctx->resolver_mode == NULL ||
         strcmp(ctx->resolver_mode, "attestam-verified") != 0) {
         return;
     }
-    protected_store_load = trustzone_protected_object_load_status("protected-credential-store.cbor",
+    protected_store_load = optee_protected_object_load_status("protected-credential-store.cbor",
                                                                   &protected_store,
                                                                   &protected_store_len);
-    issuer_allowlist_load = trustzone_protected_object_load_status("protected-issuer-allowlist.cbor",
+    issuer_allowlist_load = optee_protected_object_load_status("protected-issuer-allowlist.cbor",
                                                                    &issuer_allowlist,
                                                                    &issuer_allowlist_len);
-    store_freshness_load = trustzone_protected_object_load_status("protected-store-freshness.cbor",
+    store_freshness_load = optee_protected_object_load_status("protected-store-freshness.cbor",
                                                                   &store_freshness,
                                                                   &store_freshness_len);
-    revocation_state_load = trustzone_protected_object_load_status("protected-revocation-state.cbor",
+    revocation_state_load = optee_protected_object_load_status("protected-revocation-state.cbor",
                                                                    &revocation_state,
                                                                    &revocation_state_len);
-    agent_identity_load = trustzone_protected_object_load_status("protected-agent-identity.cbor",
+    agent_identity_load = optee_protected_object_load_status("protected-agent-identity.cbor",
                                                                  &agent_identity,
                                                                  &agent_identity_len);
-    evidence_result_load = trustzone_protected_object_load_status("verified-evidence-result.cbor",
+    evidence_result_load = optee_protected_object_load_status("verified-evidence-result.cbor",
                                                                   &evidence_result,
                                                                   &evidence_result_len);
     if (twep_wr_state_path(ctx, "teep-agent", "verified-input.cose", path, sizeof(path))) {
@@ -1208,7 +1213,7 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
     if (strcmp(evidence_result_load, "loaded-unbound") == 0) {
         evidence_source = "verified-evidence-result";
         if (evidence_acceptance_generation_present &&
-            trustzone_acceptance_generation(&current_acceptance_generation)) {
+            optee_acceptance_generation(&current_acceptance_generation)) {
             evidence_acceptance_generation_current =
                 evidence_acceptance_generation == current_acceptance_generation;
         }
@@ -1233,7 +1238,7 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
         protected_store_attestam_kid.len != 0u &&
         protected_store_suit_kid.ptr != NULL &&
         protected_store_suit_kid.len != 0u) {
-        protected_store_kid_match = twep_tz_bytes_view_equals(protected_store_attestam_kid,
+        protected_store_kid_match = twep_optee_bytes_view_equals(protected_store_attestam_kid,
                                                             observed_attestam_kid.ptr,
                                                             observed_attestam_kid.len);
     }
@@ -1266,17 +1271,17 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
     if (strcmp(agent_identity_load, "loaded-unbound") == 0) {
         if (expected_agent_measurement.len == SHA256_DIGEST_LENGTH) {
             agent_identity_measurement = "mismatch";
-            agent_identity_measurement_source = "trustzone-ta-measure-wasm";
-            if (twep_tz_read_teep_agent_wasm(ctx, &teep_agent_wasm, &teep_agent_wasm_len) == TWEP_WR_OK) {
-                if (!trustzone_measure_wasm(teep_agent_wasm, teep_agent_wasm_len,
+            agent_identity_measurement_source = "optee-ta-measure-wasm";
+            if (twep_optee_read_teep_agent_wasm(ctx, &teep_agent_wasm, &teep_agent_wasm_len) == TWEP_WR_OK) {
+                if (!optee_measure_wasm(teep_agent_wasm, teep_agent_wasm_len,
                                             teep_agent_wasm_sha256)) {
-                    agent_identity_measurement_source = "trustzone-ta-measure-unavailable";
+                    agent_identity_measurement_source = "optee-ta-measure-unavailable";
                 } else if (memcmp(teep_agent_wasm_sha256, expected_agent_measurement.ptr,
                                   SHA256_DIGEST_LENGTH) == 0) {
                     agent_identity_measurement = "matched";
                 }
             } else {
-                agent_identity_measurement_source = "trustzone-ta-measure-unavailable";
+                agent_identity_measurement_source = "optee-ta-measure-unavailable";
             }
         }
     }
@@ -1406,9 +1411,9 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
                    twep_wr_bool_label(evidence_affirming));
     (void)snprintf(agent_identity_status, sizeof(agent_identity_status),
                    "agent-identity-model-ready=true\n"
-                   "platform-backend=trustzone\n"
-                   "runtime-location=trustzone-ta\n"
-                   "teep-agent-location=trustzone-ta\n"
+                   "platform-backend=%s\n"
+                   "runtime-location=optee-ta\n"
+                   "teep-agent-location=optee-ta\n"
                    "sealed-storage-rollback-protected=false\n"
                    "agent-identity-source=platform-status-ta-local\n"
                    "agent-identity-observed=true\n"
@@ -1420,6 +1425,7 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
                    "protected-agent-identity-measurement-source=%s\n"
                    "agent-identity-binding=%s\n"
                    "agent-identity-bound=%s\n",
+                   twep_wr_platform_info()->backend_name,
                    agent_identity_load,
                    twep_wr_bool_label(agent_identity_backend_match),
                    twep_wr_bool_label(agent_identity_runtime_match),
@@ -1435,7 +1441,7 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
         (void)twep_wr_platform_write_file_atomic(path, (const uint8_t *)credential_status, strlen(credential_status));
     }
     if (twep_wr_state_path(ctx, "teep-agent", "platform-status.txt", path, sizeof(path))) {
-        (void)twep_wr_platform_write_file_atomic(path, platform_status, sizeof(platform_status) - 1);
+        (void)twep_wr_platform_write_file_atomic(path, platform_status, (size_t)platform_status_len);
     }
     if (twep_wr_state_path(ctx, "teep-agent", "evidence-status.txt", path, sizeof(path))) {
         (void)twep_wr_platform_write_file_atomic(path, (const uint8_t *)evidence_status, strlen(evidence_status));
@@ -1453,7 +1459,7 @@ void twep_tz_write_verified_diagnostics(const twep_wr_context_t *ctx)
     free(teep_agent_wasm);
 }
 
-void twep_tz_write_verified_evidence_snapshot(
+void twep_optee_write_verified_evidence_snapshot(
     const twep_wr_context_t *ctx,
     const uint8_t *evidence_result,
     size_t evidence_result_len,
@@ -1493,12 +1499,12 @@ void twep_tz_write_verified_evidence_snapshot(
                                            &acceptance_generation)) {
         return;
     }
-    if (trustzone_acceptance_slot_generation_bytes(slot0, slot0_len,
+    if (optee_acceptance_slot_generation_bytes(slot0, slot0_len,
                                                    &slot_generation)) {
         current_generation = slot_generation;
         current_generation_present = true;
     }
-    if (trustzone_acceptance_slot_generation_bytes(slot1, slot1_len,
+    if (optee_acceptance_slot_generation_bytes(slot1, slot1_len,
                                                    &slot_generation) &&
         (!current_generation_present || slot_generation > current_generation)) {
         current_generation = slot_generation;

@@ -1,0 +1,76 @@
+#!/usr/bin/expect -f
+# Copyright (c) 2026 SECOM CO., LTD. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+set timeout 600
+log_user 1
+
+if {$argc < 3} {
+    puts stderr "usage: $argv0 LOG_FILE RUN_DAEMON MODE \[MODE ...\]"
+    exit 2
+}
+set log_path [lindex $argv 0]
+set run_daemon [lindex $argv 1]
+set modes [lrange $argv 2 end]
+if {$run_daemon ne "0" && $run_daemon ne "1"} {
+    puts stderr "RUN_DAEMON must be 0 or 1"
+    exit 2
+}
+foreach mode $modes {
+    if {![regexp {^[a-z0-9-]+$} $mode]} {
+        puts stderr "invalid RISC-V smoke mode: $mode"
+        exit 2
+    }
+}
+
+log_file -a $log_path
+spawn telnet 127.0.0.1 64320
+
+proc shutdown_and_exit {code message} {
+    puts stderr $message
+    send -- "\003"
+    after 250
+    send -- "sync; poweroff\r"
+    expect {
+        eof {}
+        timeout { puts stderr "ERROR: timed out waiting for QEMU poweroff after failure" }
+    }
+    exit $code
+}
+
+proc run_ok {name cmd} {
+    send -- "$cmd; rc=\$?; echo __${name}_RC__\$rc\r"
+    expect {
+        -re "__${name}_RC__0" {}
+        -re "__${name}_RC__\[1-9\]\[0-9\]*" {
+            shutdown_and_exit 10 "ERROR: RISC-V smoke failed: $name"
+        }
+        timeout { shutdown_and_exit 11 "ERROR: timeout in RISC-V smoke: $name" }
+    }
+    expect -exact "TWEPV9# "
+}
+
+expect {
+    -re {buildroot login:} { send "root\r" }
+    timeout { puts stderr "ERROR: timed out waiting for Buildroot login"; exit 2 }
+    eof { puts stderr "ERROR: console closed before login"; exit 2 }
+}
+expect -re {# $}
+send "export PS1='TWEPV9# '\r"
+expect -exact "TWEPV9# "
+
+run_ok metadata {uname -a; cat /proc/version; test "$(cat /opt/twep/optee-platform-backend)" = riscv-optee; test -x /usr/bin/twepd; test -s /usr/lib/libtwep_wr.so; test -s /lib/optee_armtz/6b9f4d2a-2f3e-4c7b-9d21-5a6f0e3c8b10.ta}
+set smoke_env {TWEP_TEE_FS_PARENT=/data/tee TWEP_TRUSTZONE_RESET_STORAGE=1}
+foreach mode $modes {
+    set name [string map {- _} $mode]
+    run_ok $name "$smoke_env /opt/twep/run_trustzone_smokes.sh $mode"
+}
+if {$run_daemon eq "1"} {
+    run_ok daemon_helloworld {state=/tmp/twepd-v9-focused; mkdir -p "$state/run"; cd /opt/twep/guest; twepd --socket "$state/run/twepd.sock" --state-dir "$state" --once >"$state/twepd.log" 2>&1 & pid=$!; i=0; while test $i -lt 100 && test ! -S "$state/run/twepd.sock"; do sleep 0.1; i=$((i+1)); done; twep-cli --socket "$state/run/twepd.sock" helloworld >"$state/cli.out"; cli_rc=$?; wait $pid; daemon_rc=$?; cat "$state/cli.out"; cat "$state/twepd.log"; test $cli_rc -eq 0; test $daemon_rc -eq 0; grep -Fx 'Hello, World!!' "$state/cli.out"}
+}
+run_ok kernel_health {dmesg | tail -n 120; ! dmesg | grep -Ei 'panic|Oops|soft lockup|rcu.*stall'}
+send -- "sync; poweroff\r"
+expect {
+    eof {}
+    timeout { puts stderr "ERROR: timed out waiting for QEMU poweroff"; exit 12 }
+}
+wait

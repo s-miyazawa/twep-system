@@ -92,6 +92,29 @@ The TrustZone backend has a separate OP-TEE build and QEMU smoke suite. See
 OP-TEE environment, `make build-optee-trustzone`, and the TrustZone smoke
 targets.
 
+For the `arm-optee` profile, the repository can prepare the official OP-TEE
+4.8.0 QEMU v8 environment, its AArch32/AArch64 toolchains, Buildroot SDK,
+QEMU images, Rust Wasm target, and the pinned WAMR checkout at their default
+locations:
+
+```sh
+./scripts/setup_optee_arm_v8.sh --install-deps
+
+# Subsequent refreshes do not need the package-install option.
+make setup-optee-arm-v8
+
+make check-optee-arm-v8-env
+make build-optee-trustzone
+make smoke-optee-trustzone
+```
+
+The default paths are `${HOME}/opt/optee` and
+`${HOME}/opt/wasm-micro-runtime`. `OPTEE_ROOT`, `WAMR_DIR`, and `BUILD_JOBS`
+remain overridable. The smoke target uses the repository's
+`scripts/optee_postrun.py`; it boots the official QEMU v8 images, mounts the
+TA project at `/mnt/host`, and checks separate Normal World and Secure World
+logs.
+
 For the `riscv-optee` v9 workspace, place `twep-system` and `riscv-optee`
 beside one another, build v9 once to provide its RV64 Buildroot SDK, and run:
 
@@ -99,13 +122,20 @@ beside one another, build v9 once to provide its RV64 Buildroot SDK, and run:
 make build-optee-riscv-v9
 make smoke-optee-riscv-v9
 
-# With disposable AttesTAM and Veraison services already provisioned:
+# With fresh disposable AttesTAM and Veraison services running. Each target
+# provisions Veraison and registers all of its required AttesTAM fixtures:
 make smoke-optee-riscv-v9-attestam-live \
-  ATTESTAM_URL=http://10.0.2.2:8080/tam
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
+make smoke-optee-riscv-v9-attestam-verified-acceptance \
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
 make smoke-optee-riscv-v9-attestam-verified-catalog \
-  ATTESTAM_URL=http://10.0.2.2:8080/tam
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
 make smoke-optee-riscv-v9-attestam-verified-app \
-  ATTESTAM_URL=http://10.0.2.2:8080/tam
+  ATTESTAM_URL=http://10.0.2.2:8080/tam \
+  ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest
 ```
 
 The first target cross-builds the normal-world library, `twepd`, `twep-cli`,
@@ -117,8 +147,30 @@ same platform-independent binaries used by the Linux and ARM OP-TEE builds.
 The live targets exercise the AttesTAM/Veraison challenge-response, protected
 Catalog, restart/fault, protected app, and offline-restart paths on RV64. See
 [docs/AttesTAM.md](docs/AttesTAM.md) first; registration is sequence-sensitive
-and the corresponding manifests must already be registered in a fresh
+and each target registers its corresponding manifests into the required fresh
 disposable AttesTAM database.
+
+For changes shared by the two OP-TEE profiles, use the paired baseline instead
+of treating either profile as representative of the other:
+
+```sh
+make smoke-optee-all-profiles
+```
+
+For complete offline OP-TEE coverage, run all non-live scenarios on both
+profiles:
+
+```sh
+make smoke-optee-all-profiles-offline-full
+```
+
+Live targets are run separately for ARM and RISC-V, each with independently
+fresh disposable AttesTAM/Veraison state; they are not aggregated because the
+development Agent identity and service-side sequence state would otherwise be
+reused across profiles. The quick paired baseline is not a substitute for the
+full offline aggregate. A test result is complete OP-TEE coverage only when
+every applicable offline and live scenario has run on both ARM and RISC-V; see
+[docs/Testing.md](docs/Testing.md).
 
 ## Manual run
 

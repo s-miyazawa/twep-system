@@ -1,5 +1,9 @@
 # twep TEEP Agent
 
+One platform-independent Wasm artifact supports both `arm-optee` and
+`riscv-optee`. Verified identity binding treats those as distinct profiles
+with the shared `optee-ta` location; a cross-profile identity is rejected.
+
 `wasm/teep-agent` contains the special Trusted Wasm App that manages twep
 catalog lookup, AttesTAM development flows, and verified-mode observation. It
 uses the same `twep-app-v1` exported ABI as other Trusted Wasm Apps, but it is

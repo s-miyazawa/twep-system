@@ -11,7 +11,17 @@ OUT_DIR="${RISCV_OPTEE_OUT:-$REPO_ROOT/build/riscv-optee-v9}"
 EXPECTED_BUILDROOT_REV="${RISCV_OPTEE_BUILDROOT_REV:-b5e20ca925d0784473c854fae92c3fc5931802ee}"
 EXPECTED_WAMR_REV="${RISCV_OPTEE_WAMR_REV:-25bd7eb63e828e4bd242cc9b38d260b4b31c6605}"
 JOBS="${JOBS:-6}"
+TWEP_TA_WAMR_LINK="${TWEP_TA_WAMR_LINK:-1}"
 TWEP_TA_D043_TEST_HOOKS="${TWEP_TA_D043_TEST_HOOKS:-0}"
+
+case "$TWEP_TA_WAMR_LINK" in
+	0|1) ;;
+	*) echo "TWEP_TA_WAMR_LINK must be 0 or 1" >&2; exit 2 ;;
+esac
+case "$TWEP_TA_D043_TEST_HOOKS" in
+	0|1) ;;
+	*) echo "TWEP_TA_D043_TEST_HOOKS must be 0 or 1" >&2; exit 2 ;;
+esac
 
 BUILDROOT="$(realpath "$BUILDROOT")"
 WAMR_DIR="$(realpath "$WAMR_DIR")"
@@ -36,7 +46,7 @@ TA_OUT="$OUT_DIR/ta"
 WAMR_OUT="$OUT_DIR/wamr-ta"
 GUEST_DIR="$OUT_DIR/guest"
 OVERLAY="$OUT_DIR/rootfs-overlay"
-TWEP_LIB_BUILD="$REPO_ROOT/build/riscv64"
+TWEP_LIB_BUILD="$REPO_ROOT/build/twep-wr-riscv-optee"
 TA_UUID="6b9f4d2a-2f3e-4c7b-9d21-5a6f0e3c8b10"
 
 [[ -d "$BUILDROOT/.git" ]] || { echo "missing Buildroot checkout: $BUILDROOT" >&2; exit 2; }
@@ -94,7 +104,8 @@ WAMR_ROOT_DIR="$WAMR_DIR" \
 CMAKE="$CMAKE" \
 CMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
 CMAKE_FRESH=1 \
-TWEP_TRUSTZONE_BUILD_DIR="$TWEP_LIB_BUILD" \
+TWEP_OPTEE_BUILD_DIR="$TWEP_LIB_BUILD" \
+TWEP_OPTEE_PLATFORM_BACKEND=riscv-optee \
 TWEP_GUEST_DIR="$GUEST_DIR" \
 	"$REPO_ROOT/optee/twep-wr-ta/prepare-diagnose-smoke.sh"
 
@@ -106,6 +117,7 @@ make -C "$REPO_ROOT/optee/twep-wr-ta" clean \
 	TA_CROSS_COMPILE="$HOST_CROSS" \
 	TA_DEV_KIT_DIR="$TA_DEV_KIT" \
 	TA_OUT_DIR="$TA_OUT" \
+	TWEP_TA_PLATFORM_BACKEND=riscv-optee \
 	TWEP_TA_D043_TEST_HOOKS="$TWEP_TA_D043_TEST_HOOKS"
 make -C "$REPO_ROOT/optee/twep-wr-ta" -j"$JOBS" \
 	CMAKE="$CMAKE" \
@@ -117,14 +129,16 @@ make -C "$REPO_ROOT/optee/twep-wr-ta" -j"$JOBS" \
 	WAMR_ROOT_DIR="$WAMR_DIR" \
 	WAMR_TA_BUILD_DIR="$WAMR_OUT" \
 	WAMR_SPIKE_IWASM_LIB_DIR="$WAMR_OUT" \
-	TWEP_TA_WAMR_LINK=1 \
+	TWEP_TA_WAMR_LINK="$TWEP_TA_WAMR_LINK" \
 	TWEP_TA_WAMR_TARGET=RISCV64_LP64D \
+	TWEP_TA_PLATFORM_BACKEND=riscv-optee \
 	TWEP_TA_D043_TEST_HOOKS="$TWEP_TA_D043_TEST_HOOKS"
 
 echo "[4/5] staging the root filesystem overlay"
 rm -rf -- "$OVERLAY"
 mkdir -p -- "$OVERLAY/usr/bin" "$OVERLAY/usr/lib" \
-	"$OVERLAY/lib/optee_armtz" "$OVERLAY/opt/twep/guest"
+	"$OVERLAY/lib/optee_armtz" "$OVERLAY/opt/twep/guest" \
+	"$OVERLAY/opt/twep/ta"
 install -m 0755 "$REPO_ROOT/optee/twep-wr-ta/host/optee_example_twep_wr_ta" \
 	"$OVERLAY/usr/bin/optee_example_twep_wr_ta"
 install -m 0755 "$GUEST_DIR/bin/twepd" "$OVERLAY/usr/bin/twepd"
@@ -138,6 +152,13 @@ for helper in run_trustzone_smokes.sh diagnose_verified_trustzone.sh \
 	provision_and_diagnose_trustzone.sh protected_storage_failure_smoke.sh; do
 	install -m 0755 "$REPO_ROOT/optee/twep-wr-ta/$helper" "$OVERLAY/opt/twep/$helper"
 done
+for source in ta_production_runtime.c ta_runtime_cbor.c \
+	ta_host_io_continuation.c ta_app_runtime.c ta_teep_hostcalls.c \
+	ta_teep_runtime.c; do
+	install -m 0444 "$REPO_ROOT/optee/twep-wr-ta/ta/$source" \
+		"$OVERLAY/opt/twep/ta/$source"
+done
+printf '%s\n' riscv-optee >"$OVERLAY/opt/twep/optee-platform-backend"
 
 file "$OVERLAY/usr/bin/optee_example_twep_wr_ta" \
 	"$OVERLAY/usr/bin/twepd" "$OVERLAY/usr/lib/libtwep_wr.so" | tee "$OUT_DIR/file.txt"

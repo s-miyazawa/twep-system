@@ -143,9 +143,7 @@ pub(super) fn platform_status_text() -> Vec<u8> {
     }
 }
 
-pub(crate) fn trustzone_live_poc_acceptance_supported() -> bool {
+pub(crate) fn optee_live_poc_acceptance_supported() -> bool {
     let platform_status = platform_status_text();
-    line_value_equals(&platform_status, b"platform-backend", b"trustzone")
-        && line_value_equals(&platform_status, b"runtime-location", b"trustzone-ta")
-        && line_value_equals(&platform_status, b"teep-agent-location", b"trustzone-ta")
+    optee_profile(&platform_status).is_some()
 }

@@ -4,7 +4,7 @@
 
 twep enables a User to acquire, update, load, and execute Trusted Wasm Apps through `twep-cli`, with AttesTAM integration for TEEP-based provisioning.
 
-The platform has two primary backends: plain Linux (Ubuntu 24.04) and TrustZone (OP-TEE). The Linux backend runs WAMR in the REE process for development, integration, and testing. The TrustZone backend preserves the same public `twep-wr` C ABI while running the TEEP Agent, Catalog resolution, and Trusted Wasm Apps in WAMR inside the TA. Both backends run the same platform-independent Wasm binaries. SGX and Keystone remain portability boundaries rather than implemented backends.
+The platform has three implemented profiles: plain Linux (Ubuntu 24.04), ARM OP-TEE, and RISC-V OP-TEE. The Linux backend runs WAMR in the REE process for development, integration, and testing. Both OP-TEE profiles preserve the same public `twep-wr` C ABI while running the TEEP Agent, Catalog resolution, and Trusted Wasm Apps in WAMR inside the TA. All profiles run the same platform-independent Wasm binaries. SGX and Keystone remain portability boundaries rather than implemented backends.
 
 ## Confirmed Key Policies
 
@@ -14,10 +14,10 @@ The platform has two primary backends: plain Linux (Ubuntu 24.04) and TrustZone 
 | Verified provisioning | Require TEEP/COSE/SUIT verification against a real AttesTAM instance |
 | Trusted Wasm App ABI | Adopt a custom CBOR input/CBOR output ABI. `docs/ABI.md` is authoritative for details |
 | ABI evolution | Maintain schema versioning so that a later ABI revision can be defined using an Interface Definition Language |
-| Wasm binary portability | The TEEP_Agent Wasm Application and general Trusted Wasm Applications must run as the same Wasm binary across different platform backends such as Linux, TrustZone, SGX, and Keystone. Platform differences are absorbed by hostcall implementations, protected storage, and runtime policy; platform-specific Wasm artifacts are not created |
+| Wasm binary portability | The TEEP_Agent Wasm Application and general Trusted Wasm Applications must run as the same Wasm binary across different platform backends such as Linux, ARM OP-TEE, RISC-V OP-TEE, SGX, and Keystone. Platform differences are absorbed by hostcall implementations, protected storage, and runtime policy; platform-specific Wasm artifacts are not created |
 | TEEP_Agent hostcalls | Provide file/http/evidence/read-protected/random/time/log exclusively for the TEEP_Agent. COSE_Sign1 generation for TEEP messages and the current Generic EAT Evidence is performed within the Rust TEEP_Agent; the Evidence hostcall remains for ABI and diagnostic compatibility |
 | NegaPosi | Support JPEG only. Formats other than JPEG will be handled by a future `negaposi.wasm` update |
-| twepd | Run as a user service in the REE for both primary backends |
+| twepd | Run as a user service in the REE for all implemented profiles |
 
 ## Terminology
 
@@ -26,9 +26,9 @@ The platform has two primary backends: plain Linux (Ubuntu 24.04) and TrustZone 
 | User | A person who runs `twep-cli` |
 | twep-cli | User-facing CLI implemented in Go |
 | twepd | Resident daemon implemented in Go |
-| twep-wr | Public C ABI boundary. The Linux shared library hosts WAMR in the REE; the TrustZone shared library uses `libteec` to invoke TA-local WAMR |
+| twep-wr | Public C ABI boundary. The Linux shared library hosts WAMR in the REE; the ARM OP-TEE and RISC-V OP-TEE shared libraries use `libteec` to invoke TA-local WAMR |
 | Trusted Wasm App | A Wasm app implemented in Rust, based on `no_std`+`alloc`, and using the `twep-app-v1` ABI |
-| TEEP_Agent Trusted Wasm App | A special Wasm app that manages acquisition, update, installation, and loading of Trusted Wasm Apps. It can use file/http/evidence/read-protected/random/time/log hostcalls. It is bundled as a repository build artifact; both backends verify its role-specific demo code-signing identity before loading it, while the TrustZone backend additionally measures the exact Wasm bytes loaded inside the TA |
+| TEEP_Agent Trusted Wasm App | A special Wasm app that manages acquisition, update, installation, and loading of Trusted Wasm Apps. It can use file/http/evidence/read-protected/random/time/log hostcalls. It is bundled as a repository build artifact; every implemented profile verifies its role-specific demo code-signing identity before loading it, while both OP-TEE profiles additionally measure the exact Wasm bytes loaded inside the TA |
 | AttesTAM | A TAM server that distributes Trusted Components over TEEP-over-HTTP |
 | Catalog File | A mapping of command names, Wasm app names, versions, hashes, component IDs, and related data |
 | WAMR | Wasm Micro Runtime. The runtime that loads and executes Wasm in the Linux REE backend or inside the TrustZone TA |
@@ -91,7 +91,7 @@ $ twep-cli negaposi -i image.jpg -o output.jpg
 - Implements the export ABI and hostcall ABI for Rust/Wasm apps.
 - Exposes only the C ABI to Go.
 - Does not expose WAMR internal types, Wasm memory pointers, or native handles to Go.
-- Separates platform-dependent processing into `lib/twep-wr/src/platform/<backend>/`. The implemented primary backends are `linux` and `trustzone`; the `sgx` and `keystone` identifiers are portability boundaries that return unsupported until implementations are provided. `platform/linux` is an REE-only development backend and is not used for final verified security claims. `platform/trustzone` adopts OP-TEE REE FS Secure Storage as the TrustZone Secure Storage policy and treats `CFG_REE_FS=y` and `CFG_RPMB_FS=n` as permanent settings. This repository does not include rollback attacks in its threat model, and `sealed-storage-rollback-protected=false` does not by itself block the documented verified protocol checks.
+- Separates platform-dependent processing into `lib/twep-wr/src/platform/<backend>/`. The implemented primary backends are `linux`, `arm-optee`, and `riscv-optee`; both OP-TEE profiles share `platform/optee-common`, while `sgx` and `keystone` remain unsupported portability boundaries. `platform/linux` is an REE-only development backend and is not used for final verified security claims. OP-TEE adopts REE FS Secure Storage and treats `CFG_REE_FS=y` and `CFG_RPMB_FS=n` as permanent settings. This repository does not include rollback attacks in its threat model, and `sealed-storage-rollback-protected=false` does not by itself block the documented verified protocol checks.
 
 ### TEEP_Agent Trusted Wasm App
 
@@ -176,7 +176,7 @@ concerns, not missing requirements for this small academic implementation.
 | wasm apps | `$STATE/apps/*.wasm` | `/var/lib/twep/apps/*.wasm` |
 | logs | stdout/systemd journal | systemd journal |
 
-The current Linux and TrustZone configurations run `twepd` as a user service in the REE and use the user-service paths above. The system-service paths define the corresponding deployment layout when a system service is configured.
+The current Linux, ARM OP-TEE, and RISC-V OP-TEE profiles run `twepd` as a user service in the REE and use the user-service paths above. The system-service paths define the corresponding deployment layout when a system service is configured.
 If `XDG_RUNTIME_DIR` is unset, the client and daemon fall back to
 `<os.TempDir()>/twep/twepd.sock`, normally `/tmp/twep/twepd.sock` on Linux, as
 specified in `docs/Interface.md`.
@@ -349,7 +349,7 @@ twep-cli-response = {
 - Generates Evidence for AttesTAM challenge-response.
 - Treats AttesTAM as the Relying Party for Veraison. TEEP Agent does not receive or verify Veraison Attestation Results.
 - Verifies the TAM trust anchor, TAM-signed Update, acceptance-generation freshness, and agent key binding.
-- Uses the same TEEP Agent-generated development Evidence on plain Linux and TrustZone. Normal sessions do not delegate Evidence signing to the REE.
+- Uses the same TEEP Agent-generated development Evidence on plain Linux and both OP-TEE profiles. Normal sessions do not delegate Evidence signing to the REE.
 
 ## Acceptance Criteria
 

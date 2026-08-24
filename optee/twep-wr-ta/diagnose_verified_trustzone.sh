@@ -4,6 +4,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 set -eu
 
+OPTEE_PLATFORM_BACKEND=${TWEP_OPTEE_PLATFORM_BACKEND:-arm-optee}
+if [ -f "$(dirname "$0")/optee-platform-backend" ]; then
+	OPTEE_PLATFORM_BACKEND=$(cat "$(dirname "$0")/optee-platform-backend")
+fi
+case "${OPTEE_PLATFORM_BACKEND}" in
+	arm-optee|riscv-optee) ;;
+	*) echo "invalid OP-TEE platform backend marker: ${OPTEE_PLATFORM_BACKEND}" >&2; exit 2 ;;
+esac
+
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 GUEST_DIR="${PROJECT_DIR}/guest"
 STATE_DIR="/tmp/twep-trustzone-diagnose-state"
@@ -93,7 +102,7 @@ for attempt in 1 2 3; do
 	./bin/twep-cli diagnose verified --state-dir "${STATE_DIR}" >"${STATE_DIR}/diagnose.txt"
 	./bin/twep-cli diagnose verified --state-dir "${STATE_DIR}" --output-format json >"${STATE_DIR}/diagnose.json"
 
-	if grep -q "platform-backend=trustzone" "${STATE_DIR}/diagnose.txt"; then
+	if grep -q "platform-backend=${OPTEE_PLATFORM_BACKEND}" "${STATE_DIR}/diagnose.txt"; then
 		break
 	fi
 	if [ "${attempt}" -eq 3 ]; then
@@ -104,9 +113,9 @@ done
 
 grep -q "sealed-storage-security=tee-ree-fs-secure-storage" "${STATE_DIR}/diagnose.txt"
 grep -q "sealed-storage-rollback-protected=false" "${STATE_DIR}/diagnose.txt"
-grep -q "runtime-location=trustzone-ta" "${STATE_DIR}/diagnose.txt"
-grep -q "teep-agent-location=trustzone-ta" "${STATE_DIR}/diagnose.txt"
-grep -q "catalog-resolution-location=trustzone-ta" "${STATE_DIR}/diagnose.txt"
+grep -q "runtime-location=optee-ta" "${STATE_DIR}/diagnose.txt"
+grep -q "teep-agent-location=optee-ta" "${STATE_DIR}/diagnose.txt"
+grep -q "catalog-resolution-location=optee-ta" "${STATE_DIR}/diagnose.txt"
 # D038 keeps rollback protection as diagnostic (`false` on REE FS) while
 # source-aligned policy/identity/evidence signals may be `bound`/`true`.
 grep -q "agent-identity-source=platform-status-ta-local" "${STATE_DIR}/diagnose.txt"
@@ -136,12 +145,12 @@ grep -q '"label": "platform-status"' "${STATE_DIR}/diagnose.json"
 grep -q '"label": "evidence-status"' "${STATE_DIR}/diagnose.json"
 grep -q '"label": "agent-identity-status"' "${STATE_DIR}/diagnose.json"
 grep -q '"label": "credential-status"' "${STATE_DIR}/diagnose.json"
-grep -q "platform-backend=trustzone" "${STATE_DIR}/diagnose.json"
+grep -q "platform-backend=${OPTEE_PLATFORM_BACKEND}" "${STATE_DIR}/diagnose.json"
 grep -q "sealed-storage-security=tee-ree-fs-secure-storage" "${STATE_DIR}/diagnose.json"
 grep -q "sealed-storage-rollback-protected=false" "${STATE_DIR}/diagnose.json"
-grep -q "runtime-location=trustzone-ta" "${STATE_DIR}/diagnose.json"
-grep -q "teep-agent-location=trustzone-ta" "${STATE_DIR}/diagnose.json"
-grep -q "catalog-resolution-location=trustzone-ta" "${STATE_DIR}/diagnose.json"
+grep -q "runtime-location=optee-ta" "${STATE_DIR}/diagnose.json"
+grep -q "teep-agent-location=optee-ta" "${STATE_DIR}/diagnose.json"
+grep -q "catalog-resolution-location=optee-ta" "${STATE_DIR}/diagnose.json"
 # D038 keeps rollback protection as diagnostic (`false` on REE FS) while
 # source-aligned policy/identity/evidence signals may be `bound`/`true`.
 grep -q "agent-identity-source=platform-status-ta-local" "${STATE_DIR}/diagnose.json"

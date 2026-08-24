@@ -1,17 +1,17 @@
 /* Copyright (c) 2026 SECOM CO., LTD. All rights reserved. */
 /* SPDX-License-Identifier: BSD-2-Clause */
-#include "trustzone_internal.h"
+#include "optee_internal.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-void twep_tz_free_artifacts(uint8_t *teep_agent_wasm, uint8_t *catalog, uint8_t *app_wasm)
+void twep_optee_free_artifacts(uint8_t *teep_agent_wasm, uint8_t *catalog, uint8_t *app_wasm)
 {
     free(teep_agent_wasm);
     free(catalog);
     free(app_wasm);
 }
-twep_wr_status_t twep_tz_read_dev_agent_public_key(
+twep_wr_status_t twep_optee_read_dev_agent_public_key(
     const twep_wr_context_t *ctx,
     uint8_t **out_public_key,
     size_t *out_public_key_len)
@@ -36,7 +36,7 @@ twep_wr_status_t twep_tz_read_dev_agent_public_key(
     return TWEP_WR_OK;
 }
 
-bool twep_tz_bytes_view_equals(bytes_view_t view, const uint8_t *bytes, size_t len)
+bool twep_optee_bytes_view_equals(bytes_view_t view, const uint8_t *bytes, size_t len)
 {
     if (bytes == NULL || view.ptr == NULL || view.len != len) {
         return false;
@@ -44,7 +44,7 @@ bool twep_tz_bytes_view_equals(bytes_view_t view, const uint8_t *bytes, size_t l
     return memcmp(view.ptr, bytes, len) == 0;
 }
 
-twep_wr_status_t twep_tz_read_teep_agent_wasm(const twep_wr_context_t *ctx,
+twep_wr_status_t twep_optee_read_teep_agent_wasm(const twep_wr_context_t *ctx,
                                                        uint8_t **out_teep_agent_wasm,
                                                        size_t *out_teep_agent_wasm_len)
 {

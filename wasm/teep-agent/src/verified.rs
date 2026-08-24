@@ -62,13 +62,15 @@ pub(crate) use diagnostics::verification_state_text;
 use dry_run::{
     line_value_equals, platform_status_text, protected_storage_binding_from_platform_status,
 };
-pub(crate) use dry_run::{run_verified_dry_run, trustzone_live_poc_acceptance_supported};
+pub(crate) use dry_run::{optee_live_poc_acceptance_supported, run_verified_dry_run};
 use evidence_status::*;
 pub(crate) use evidence_status::{
     protected_attestam_acceptance_is_current, protected_evidence_result_is_stale,
 };
-pub(crate) use live_acceptance::accept_live_attestam_update_cose;
 use live_acceptance::*;
+pub(crate) use live_acceptance::{
+    accept_live_attestam_update_cose, linux_attestam_acceptance_observation_cbor,
+};
 pub use state::VerificationState;
 #[cfg(test)]
 pub use state::VerificationStep;
@@ -139,8 +141,41 @@ fn final_trust_anchor_ready(
         && binding_status.bound()
 }
 
+pub(super) fn optee_profile(platform_status: &[u8]) -> Option<(&'static [u8], &'static [u8])> {
+    if line_value_equals(platform_status, b"platform-backend", b"arm-optee")
+        && line_value_equals(platform_status, b"runtime-location", b"optee-ta")
+        && line_value_equals(platform_status, b"teep-agent-location", b"optee-ta")
+    {
+        Some((b"arm-optee", b"optee-ta"))
+    } else if line_value_equals(platform_status, b"platform-backend", b"riscv-optee")
+        && line_value_equals(platform_status, b"runtime-location", b"optee-ta")
+        && line_value_equals(platform_status, b"teep-agent-location", b"optee-ta")
+    {
+        Some((b"riscv-optee", b"optee-ta"))
+    } else if line_value_equals(platform_status, b"platform-backend", b"trustzone")
+        && line_value_equals(platform_status, b"runtime-location", b"trustzone-ta")
+        && line_value_equals(platform_status, b"teep-agent-location", b"trustzone-ta")
+    {
+        Some((b"trustzone", b"trustzone-ta"))
+    } else {
+        None
+    }
+}
+
+pub(super) fn optee_backend_name(platform_status: &[u8]) -> Option<&'static [u8]> {
+    if line_value_equals(platform_status, b"platform-backend", b"arm-optee") {
+        Some(b"arm-optee")
+    } else if line_value_equals(platform_status, b"platform-backend", b"riscv-optee") {
+        Some(b"riscv-optee")
+    } else if line_value_equals(platform_status, b"platform-backend", b"trustzone") {
+        Some(b"trustzone")
+    } else {
+        None
+    }
+}
+
 fn protected_final_storage_binding(platform_status: &[u8]) -> bool {
-    line_value_equals(platform_status, b"platform-backend", b"trustzone")
+    optee_profile(platform_status).is_some()
         && (line_value_equals(
             platform_status,
             b"sealed-storage-security",

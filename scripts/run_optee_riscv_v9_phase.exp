@@ -11,7 +11,7 @@ if {$argc != 3} {
 set log_path [lindex $argv 0]
 set mode [lindex $argv 1]
 set attestam_url [lindex $argv 2]
-if {![regexp {^(attestam-live|attestam-verified-catalog|attestam-verified-app)$} $mode]} {
+if {![regexp {^(attestam-live|attestam-verified-acceptance|attestam-verified-catalog|attestam-verified-app)$} $mode]} {
     puts stderr "unsupported RISC-V live phase mode: $mode"
     exit 2
 }

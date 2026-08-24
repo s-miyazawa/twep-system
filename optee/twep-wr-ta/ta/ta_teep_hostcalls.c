@@ -623,10 +623,10 @@ static int32_t teep_host_platform_status(wasm_exec_env_t exec_env, uint8_t *buf,
 					 uint32_t buf_cap, uint32_t *out_len)
 {
 	static const char status[] =
-		"platform-backend=trustzone\n"
-		"runtime-location=trustzone-ta\n"
-		"teep-agent-location=trustzone-ta\n"
-		"catalog-resolution-location=trustzone-ta\n"
+		"platform-backend=" TWEP_TA_PLATFORM_BACKEND "\n"
+		"runtime-location=optee-ta\n"
+		"teep-agent-location=optee-ta\n"
+		"catalog-resolution-location=optee-ta\n"
 		"sealed-storage-security=tee-ree-fs-secure-storage\n"
 		"sealed-storage-rollback-protected=false\n";
 	size_t len = sizeof(status) - 1;

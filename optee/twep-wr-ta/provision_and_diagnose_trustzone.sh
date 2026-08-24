@@ -193,12 +193,12 @@ provision_object protected-agent-identity.cbor "${FIXTURES_DIR}/protected-agent-
 diagnose_allow_failure
 grep -q "protected-agent-identity-load=loaded-unbound" "${STATE_DIR}/diagnose.txt"
 grep -q "protected-agent-identity-measurement=mismatch" "${STATE_DIR}/diagnose.txt"
-grep -q "protected-agent-identity-measurement-source=trustzone-ta-measure-wasm" "${STATE_DIR}/diagnose.txt"
+grep -q "protected-agent-identity-measurement-source=optee-ta-measure-wasm" "${STATE_DIR}/diagnose.txt"
 grep -q "agent-identity-binding=matched-unbound" "${STATE_DIR}/diagnose.txt"
 grep -q "agent-identity-bound=false" "${STATE_DIR}/diagnose.txt"
 grep -q "protected-agent-identity-load=loaded-unbound" "${STATE_DIR}/diagnose.json"
 grep -q "protected-agent-identity-measurement=mismatch" "${STATE_DIR}/diagnose.json"
-grep -q "protected-agent-identity-measurement-source=trustzone-ta-measure-wasm" "${STATE_DIR}/diagnose.json"
+grep -q "protected-agent-identity-measurement-source=optee-ta-measure-wasm" "${STATE_DIR}/diagnose.json"
 grep -q "agent-identity-binding=matched-unbound" "${STATE_DIR}/diagnose.json"
 grep -q "agent-identity-bound=false" "${STATE_DIR}/diagnose.json"
 provision_object protected-agent-identity.cbor

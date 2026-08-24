@@ -4,6 +4,15 @@
 # SPDX-License-Identifier: BSD-2-Clause
 set -eu
 
+OPTEE_PLATFORM_BACKEND=${TWEP_OPTEE_PLATFORM_BACKEND:-arm-optee}
+if [ -f "$(dirname "$0")/optee-platform-backend" ]; then
+	OPTEE_PLATFORM_BACKEND=$(cat "$(dirname "$0")/optee-platform-backend")
+fi
+case "${OPTEE_PLATFORM_BACKEND}" in
+	arm-optee|riscv-optee) ;;
+	*) echo "invalid OP-TEE platform backend marker: ${OPTEE_PLATFORM_BACKEND}" >&2; exit 2 ;;
+esac
+
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP=optee_example_twep_wr_ta
 
@@ -26,7 +35,7 @@ run_default_smoke() {
 	grep -q "random smoke ok" "/tmp/twep-trustzone-default-smoke.log"
 	grep -q "time smoke ok" "/tmp/twep-trustzone-default-smoke.log"
 	grep -q "CBOR dry-run ok" "/tmp/twep-trustzone-default-smoke.log"
-	grep -q "platform-backend=trustzone" "/tmp/twep-trustzone-default-smoke.log"
+	grep -q "platform-backend=${OPTEE_PLATFORM_BACKEND}" "/tmp/twep-trustzone-default-smoke.log"
 	grep -q "sealed-storage-security=tee-ree-fs-secure-storage" "/tmp/twep-trustzone-default-smoke.log"
 	grep -q "sealed-storage-rollback-protected=false" "/tmp/twep-trustzone-default-smoke.log"
 	# Default smoke does not execute the verified TEEP/COSE/SUIT path; final
@@ -299,20 +308,20 @@ run_attestam_live() {
 	cat "${state}/twep-cli.out"
 	grep -q "Hello, World!!" "${state}/twep-cli.out"
 	mkdir -p "${state}/teep-agent"
-	cat >"${state}/teep-agent/platform-status.txt" <<'EOF_STATUS'
-platform-backend=trustzone
-runtime-location=trustzone-ta
-teep-agent-location=trustzone-ta
-catalog-resolution-location=trustzone-ta
+	cat >"${state}/teep-agent/platform-status.txt" <<EOF_STATUS
+platform-backend=${OPTEE_PLATFORM_BACKEND}
+runtime-location=optee-ta
+teep-agent-location=optee-ta
+catalog-resolution-location=optee-ta
 sealed-storage-security=tee-ree-fs-secure-storage
 sealed-storage-rollback-protected=false
 final-verified=false
 EOF_STATUS
 	twep-cli diagnose verified --state-dir "${state}" >"${state}/diagnose.txt"
 	twep-cli diagnose verified --state-dir "${state}" --output-format json >"${state}/diagnose.json"
-	grep -q "runtime-location=trustzone-ta" "${state}/diagnose.txt"
-	grep -q "teep-agent-location=trustzone-ta" "${state}/diagnose.txt"
-	grep -q "catalog-resolution-location=trustzone-ta" "${state}/diagnose.txt"
+	grep -q "runtime-location=optee-ta" "${state}/diagnose.txt"
+	grep -q "teep-agent-location=optee-ta" "${state}/diagnose.txt"
+	grep -q "catalog-resolution-location=optee-ta" "${state}/diagnose.txt"
 	# AttesTAM live smoke checks bridge placement only. The synthetic state above
 	# intentionally omits final verified artifacts, so rollback=false is
 	# diagnostic and final verification must stay false.
@@ -495,7 +504,7 @@ run_attestam_verified_catalog() {
 		echo "verified Catalog session unexpectedly executed application code" >&2
 		exit 1
 	fi
-	# In the TrustZone backend, Wasm write_file observations are TA-local
+	# In both OP-TEE profiles, Wasm write_file observations are TA-local
 	# transient objects and are not exported into the REE state directory.
 	# The verified-required terminal result is reached only after the signed
 	# Success POST receives the AttesTAM NoContent response.

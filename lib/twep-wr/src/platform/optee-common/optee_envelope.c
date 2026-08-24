@@ -1,6 +1,6 @@
 /* Copyright (c) 2026 SECOM CO., LTD. All rights reserved. */
 /* SPDX-License-Identifier: BSD-2-Clause */
-#include "trustzone_internal.h"
+#include "optee_internal.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +53,7 @@ static size_t bytes_field_len(const char *key, size_t value_len)
     return type_len_size(strlen(key)) + strlen(key) + type_len_size(value_len) + value_len;
 }
 
-uint8_t *twep_tz_make_execute_envelope(
+uint8_t *twep_optee_make_execute_envelope(
     const twep_wr_context_t *ctx, const twep_wr_normalized_request_t *request,
     const uint8_t *teep_agent_wasm, size_t teep_agent_wasm_len,
     const uint8_t *catalog, size_t catalog_len,

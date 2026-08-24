@@ -34,20 +34,34 @@ set(WAMR_BUILD_INSTRUCTION_METERING 1)
 include(${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake)
 
 set(TWEP_WR_PLATFORM_BACKEND "linux" CACHE STRING "twep-wr platform backend")
+set_property(CACHE TWEP_WR_PLATFORM_BACKEND PROPERTY STRINGS linux arm-optee riscv-optee sgx keystone)
 set(TWEP_WR_PLATFORM_SOURCE "")
 if(TWEP_WR_PLATFORM_BACKEND STREQUAL "linux")
   set(TWEP_WR_PLATFORM_SOURCE src/platform/linux/platform_linux.c)
-elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "trustzone")
+elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
+       TWEP_WR_PLATFORM_BACKEND STREQUAL "riscv-optee")
+  if(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee")
+    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|arm64|aarch64)")
+      message(FATAL_ERROR "TWEP_WR_PLATFORM_BACKEND=arm-optee requires an arm or aarch64 target, got ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    set(TWEP_WR_OPTEE_PROFILE_SOURCE src/platform/arm-optee/platform_arm_optee.c)
+  else()
+    if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
+      message(FATAL_ERROR "TWEP_WR_PLATFORM_BACKEND=riscv-optee requires a riscv64 target, got ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    set(TWEP_WR_OPTEE_PROFILE_SOURCE src/platform/riscv-optee/platform_riscv_optee.c)
+  endif()
   set(TWEP_WR_PLATFORM_SOURCE
-        src/platform/trustzone/platform_trustzone.c
-        src/platform/trustzone/trustzone_artifacts.c
-        src/platform/trustzone/trustzone_candidate.c
-        src/platform/trustzone/trustzone_diagnostics.c
-        src/platform/trustzone/trustzone_envelope.c
-        src/platform/trustzone/trustzone_host_io.c
-        src/platform/trustzone/trustzone_session_storage.c
-        src/platform/trustzone/trustzone_storage.c
-        src/platform/trustzone/trustzone_transport.c
+        src/platform/optee-common/optee_execute.c
+        src/platform/optee-common/optee_artifacts.c
+        src/platform/optee-common/optee_candidate.c
+        src/platform/optee-common/optee_diagnostics.c
+        src/platform/optee-common/optee_envelope.c
+        src/platform/optee-common/optee_host_io.c
+        src/platform/optee-common/optee_session_storage.c
+        src/platform/optee-common/optee_storage.c
+        src/platform/optee-common/optee_transport.c
+        ${TWEP_WR_OPTEE_PROFILE_SOURCE}
   )
 elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
   set(TWEP_WR_PLATFORM_SOURCE src/platform/sgx/platform_sgx.c)
@@ -80,10 +94,11 @@ target_include_directories(twep_wr PRIVATE
   ${WAMR_ROOT_DIR}/core/iwasm/include
 )
 
-if(TWEP_WR_PLATFORM_BACKEND STREQUAL "trustzone")
-  target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_TRUSTZONE=1)
-  set(TWEP_WR_TEEC_EXPORT "$ENV{HOME}/opt/optee/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr" CACHE PATH "OP-TEE client export prefix for TrustZone backend")
-  set(TWEP_WR_TEEC_LIB_DIR "${TWEP_WR_TEEC_EXPORT}/lib" CACHE PATH "OP-TEE libteec directory for TrustZone backend")
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
+   TWEP_WR_PLATFORM_BACKEND STREQUAL "riscv-optee")
+  target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_OPTEE=1)
+  set(TWEP_WR_TEEC_EXPORT "$ENV{HOME}/opt/optee/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr" CACHE PATH "OP-TEE client export prefix")
+  set(TWEP_WR_TEEC_LIB_DIR "${TWEP_WR_TEEC_EXPORT}/lib" CACHE PATH "OP-TEE libteec directory")
   if(NOT EXISTS "${TWEP_WR_TEEC_EXPORT}/include/tee_client_api.h")
     message(FATAL_ERROR "tee_client_api.h not found below TWEP_WR_TEEC_EXPORT=${TWEP_WR_TEEC_EXPORT}")
   endif()

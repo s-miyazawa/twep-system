@@ -1,5 +1,11 @@
 # Security.md: TWEP Security Design Notes
 
+ARM OP-TEE and RISC-V OP-TEE are distinct protected-platform identities even
+though they share code and the TEEP Agent Wasm. An identity provisioned for
+one cannot bind on the other. Legacy `trustzone`/`trustzone-ta` values are
+accepted only as a complete pair. Secure Storage meaning and the
+`final-verified=false` boundary are unchanged.
+
 ## KISS / DRY
 
 The security design follows KISS and DRY. Trust boundaries, assets, threats, and mitigations are organized by the smallest unit of responsibility, and the same validation condition is not defined under different names in multiple paths. Commonization and simplification are permitted only when they do not weaken privilege separation, validation strength, or auditability.
@@ -10,7 +16,7 @@ The security design follows KISS and DRY. Trust boundaries, assets, threats, and
 - Detect tampering with the Catalog File and Wasm app binary.
 - Do not grant direct file system or network permissions to general Trusted Wasm Apps.
 - Separate the privileges of TEEP_Agent from those of general apps.
-- Enforce explicit trust boundaries for both the plain Linux backend and the TrustZone backend, with REE-side `twepd` outside the TrustZone trust boundary.
+- Enforce explicit trust boundaries for the plain Linux backend and both OP-TEE profiles, with REE-side `twepd` outside the OP-TEE trust boundary.
 
 ## Platform Trust Boundaries
 
@@ -29,7 +35,7 @@ Resolver selection does not change this boundary. The mock and AttesTAM modes on
 
 ### TrustZone Backend
 
-The TrustZone backend runs TEEP_Agent, Catalog resolution, and general Trusted Wasm Apps in TA-local WAMR. The REE transports requests, cache and state bytes, and HTTP responses, but it does not generate Generic EAT Evidence or decide Catalog contents, component classification, payload validity, promotion eligibility, or execution authorization. OP-TEE REE FS Secure Storage holds protected acceptance, credential, identity, and Catalog state according to the schemas in `docs/Interface.md` and `docs/ABI.md`.
+Both OP-TEE profiles run TEEP_Agent, Catalog resolution, and general Trusted Wasm Apps in TA-local WAMR. The REE transports requests, cache and state bytes, and HTTP responses, but it does not generate Generic EAT Evidence or decide Catalog contents, component classification, payload validity, promotion eligibility, or execution authorization. OP-TEE REE FS Secure Storage holds protected acceptance, credential, identity, and Catalog state according to the schemas in `docs/Interface.md` and `docs/ABI.md`.
 
 ## Assets
 
@@ -37,7 +43,7 @@ The TrustZone backend runs TEEP_Agent, Catalog resolution, and general Trusted W
 | --- | --- |
 | Trusted Wasm App binary | Tamper detection and rollback prevention |
 | Catalog File | Tamper detection for the command mapping table |
-| TEEP_Agent Wasm | Tamper detection for management logic. A privileged Wasm App that can use file/http/evidence/read-protected/random/time/log hostcalls. It also generates COSE_Sign1 for TEEP messages. Linux and TrustZone verify its role-specific demo code signature before loading it; final verified mode additionally binds its measurement or identity to the platform root of trust |
+| TEEP_Agent Wasm | Tamper detection for management logic. A privileged Wasm App that can use file/http/evidence/read-protected/random/time/log hostcalls. It also generates COSE_Sign1 for TEEP messages. Linux and both OP-TEE profiles verify its role-specific demo code signature before loading it; final verified mode additionally binds its measurement or identity to the platform root of trust |
 | TAM trust anchor | Exclusion of unauthorized TAMs |
 | agent key | Protection of the agent identity |
 | User input/output file | Prevention of path traversal and unintended reads or writes |
@@ -47,8 +53,8 @@ The TrustZone backend runs TEEP_Agent, Catalog resolution, and general Trusted W
 
 | Asset or decision | Attacker capability considered | Trusted authority | Guaranteed now | Not guaranteed | Linux / TrustZone | Time horizon |
 | --- | --- | --- | --- | --- | --- | --- |
-| Evidence production | Public Wasm bytes disclose the fixed private key; transport can be delayed or replayed | Current PoC Rust TEEP Agent plus fixed development Evidence key | Protocol shape, nonce/key correspondence, and Veraison interoperability can be exercised | Hardware-rooted Evidence, unforgeability, or production key custody | Linux and TrustZone use the same TEEP Agent-generated development Evidence; neither can claim final verification from it | Current PoC; hardware Evidence is future work |
-| Veraison appraisal | Network and REE can delay, drop, or alter responses | Veraison, consumed by AttesTAM as Relying Party | AttesTAM requires an affirming appraisal before its acceptance step | TEEP Agent does not receive or independently validate a Veraison Attestation Result | Same authority model on both backends | Current |
+| Evidence production | Public Wasm bytes disclose the fixed private key; transport can be delayed or replayed | Current PoC Rust TEEP Agent plus fixed development Evidence key | Protocol shape, nonce/key correspondence, and Veraison interoperability can be exercised | Hardware-rooted Evidence, unforgeability, or production key custody | Linux and both OP-TEE profiles use the same TEEP Agent-generated development Evidence; none can claim final verification from it | Current PoC; hardware Evidence is future work |
+| Veraison appraisal | Network and REE can delay, drop, or alter responses | Veraison, consumed by AttesTAM as Relying Party | AttesTAM requires an affirming appraisal before its acceptance step | TEEP Agent does not receive or independently validate a Veraison Attestation Result | Same authority model on all implemented profiles | Current |
 | AttesTAM acceptance | REE can replay or mix sessions and responses | TAM signature plus TA-session transcript, D046 token handling, and D043 protected generation | A current TAM-signed Update is bound to the live Evidence exchange and consumed once | Availability, production credential lifecycle, or `final-verified=true` | Linux observes; TrustZone can commit the protected acceptance state | Current PoC |
 | Catalog authorization | REE can supply arbitrary Catalog or app bytes | TEEP Agent semantic validation plus the TA-owned D047/D043 publication transaction | Only the default-name Catalog TC can become the active protected Catalog | App TCs, debug JSON, management data, and personalization cannot authorize Catalog changes | Linux is observation-only; TrustZone is authoritative | Current M9.2/M9.3 |
 | App installation and execution authorization | REE can substitute candidate bytes or names | TEEP Agent app-TC verification and protected Catalog lookup, followed by TA-owned protected app publication | One requested app is accepted only when its command and exact payload digest match the active protected Catalog; the protected bytes are reloaded and executed with no app hostcalls | Multi-app storage, rollback resistance, production credentials, and `final-verified=true` are not claimed | Linux retains development paths; TrustZone M9.3 is authoritative for this bounded PoC | Current M9.3 |
@@ -88,7 +94,7 @@ app execution authorization.
 
 ## Catalog/Wasm Validation
 
-Baseline checks on both backends:
+Baseline checks on all implemented profiles:
 
 - Include sha256 in each catalog entry.
 - Calculate sha256 before loading Wasm and confirm that it matches.
@@ -115,7 +121,7 @@ Additional checks in verified provisioning:
 - For `negaposi -o PATH`, the CLI permits any path writable with User privileges. twepd/twep-wr do not handle arbitrary file paths for general apps; the CLI writes `files.output` to a temporary file in the same directory and then renames it. Overwriting an existing file is permitted according to User privileges. A system-service deployment must define a separate output policy.
 - `negaposi` handles only JPEG bytes. Both the CLI and app reject formats other than JPEG.
 
-The general app policy is the same for the TrustZone backend. `twep_wr_execute` runs the production WAMR runtime inside the TA without setting the TEEP_Agent capability on general apps. If a general app imports `env.*` or `twep_teep_env.*`, reject it through link/capability checks inside the TA, and do not allow it to use file/network/evidence/random/time/read-protected hostcalls. Keep reads and writes of `negaposi` User file paths on the CLI/REE side, and pass only CBOR input containing JPEG bytes to the TA.
+The general app policy is the same for both OP-TEE profiles. `twep_wr_execute` runs the production WAMR runtime inside the TA without setting the TEEP_Agent capability on general apps. If a general app imports `env.*` or `twep_teep_env.*`, reject it through link/capability checks inside the TA, and do not allow it to use file/network/evidence/random/time/read-protected hostcalls. Keep reads and writes of `negaposi` User file paths on the CLI/REE side, and pass only CBOR input containing JPEG bytes to the TA.
 
 ### TEEP_Agent
 
@@ -124,7 +130,7 @@ The general app policy is the same for the TrustZone backend. `twep_wr_execute` 
 - Permit random/time/log.
 - Do not permit DNS or communication with arbitrary URLs.
 
-For the TrustZone backend, run TEEP_Agent in the WAMR runtime inside the TA and register `twep_teep_env` hostcalls inside the TA. Restrict file reads and writes to TA-managed object IDs rather than arbitrary paths; the REE side is responsible only for transporting object bytes. The TA retains the policy, request ID, and transcript for HTTP POST, explicitly requests HTTP from the REE broker as `need_host_io`, and receives the response bytes through `RESUME_HOST_IO`. The Rust TEEP_Agent creates Generic EAT Evidence directly, so normal sessions do not produce an Evidence continuation. The `create_evidence` hostcall and TA continuation remain solely for ABI and diagnostic compatibility. The REE broker is responsible for actual HTTP communication and cache byte transport; it must not interpret Catalog lookup, TC/app classification, payload hash validation, or promotion eligibility as trust decisions. Per D027, the TrustZone path does not retain a WAMR call frame across an REE round trip. Instead, the same TEEP_Agent Wasm binary is re-executed or entered through an explicit continuation entry using TA session-local continuation state, a transcript digest or sequence, and host I/O result validation.
+For both OP-TEE profiles, run TEEP_Agent in the WAMR runtime inside the TA and register `twep_teep_env` hostcalls inside the TA. Restrict file reads and writes to TA-managed object IDs rather than arbitrary paths; the REE side is responsible only for transporting object bytes. The TA retains the policy, request ID, and transcript for HTTP POST, explicitly requests HTTP from the REE broker as `need_host_io`, and receives the response bytes through `RESUME_HOST_IO`. The Rust TEEP_Agent creates Generic EAT Evidence directly, so normal sessions do not produce an Evidence continuation. The `create_evidence` hostcall and TA continuation remain solely for ABI and diagnostic compatibility. The REE broker is responsible for actual HTTP communication and cache byte transport; it must not interpret Catalog lookup, TC/app classification, payload hash validation, or promotion eligibility as trust decisions. Per D027, neither OP-TEE path retains a WAMR call frame across an REE round trip. Instead, the same TEEP_Agent Wasm binary is re-executed or entered through an explicit continuation entry using TA session-local continuation state, a transcript digest or sequence, and host I/O result validation.
 
 There are two distinct SHA-256 trust boundaries. SHA-256 for Catalog/app/SUIT authorization is decided by the same TEEP_Agent Wasm binary across platforms. TA-side C code uses SHA-256 only for transcript binding and protected-record integrity: it checks that bytes passed to a dedicated commit match the TEEP Agent-supplied digest, stores that digest with the protected app, and compares it with the TEEP Agent resolver result immediately before execution. These checks prevent transport, persistence, and selection mix-ups; they do not determine Catalog entries, Trusted Component classification, or promotion eligibility.
 
@@ -180,7 +186,7 @@ When store freshness and revocation state can be compared against protected obje
 
 The PoC fixture generator creates the credential store and issuer-policy objects, and the TrustZone smoke provisions them through the existing TA Secure Storage helper rather than a network service or TEEP Update. Keep platform-dependent processing under `lib/twep-wr/src/platform/<backend>/`. Because `platform/linux` is an REE-only development backend, its sealed-storage-like APIs remain observation-only.
 
-On the TrustZone backend, run TEEP_Agent, Catalog resolution, and general app execution in the WAMR runtime inside the TA. The current OP-TEE configuration, `CFG_REE_FS=y` and `CFG_RPMB_FS=n`, adopts REE FS Secure Storage for this PoC. Successful execution inside the TA, TA Secure Storage PUT/GET, Catalog/app resolution, TEEP/COSE/SUIT validation, fixed-key policy consistency, a TAM-signed Update with current D043 generation, and TEEP_Agent identity matching are all useful PoC evidence, but D045 requires the aggregate outcome to remain explicitly insecure and `final-verified=false`. Diagnostics report `runtime-location=trustzone-ta`, `teep-agent-location=trustzone-ta`, `catalog-resolution-location=trustzone-ta`, `sealed-storage-security=tee-ree-fs-secure-storage`, and `sealed-storage-rollback-protected=false`; rollback is outside the PoC threat model.
+On either OP-TEE profile, run TEEP_Agent, Catalog resolution, and general app execution in the WAMR runtime inside the TA. The current OP-TEE configuration, `CFG_REE_FS=y` and `CFG_RPMB_FS=n`, adopts REE FS Secure Storage for this PoC. Successful execution inside the TA, TA Secure Storage PUT/GET, Catalog/app resolution, TEEP/COSE/SUIT validation, fixed-key policy consistency, a TAM-signed Update with current D043 generation, and TEEP_Agent identity matching are all useful PoC evidence, but D045 requires the aggregate outcome to remain explicitly insecure and `final-verified=false`. Diagnostics report the selected backend, `runtime-location=optee-ta`, `teep-agent-location=optee-ta`, `catalog-resolution-location=optee-ta`, `sealed-storage-security=tee-ree-fs-secure-storage`, and `sealed-storage-rollback-protected=false`; rollback is outside the PoC threat model.
 
 The official responsibilities of the Go/REE side are IPC with `twep-cli`, HTTP/TLS communication, buffer transport, and state file I/O. The REE-side Go module `internal/teepbroker` is called `TEEP_Broker` in the design. Generation and validation of COSE data, generation and validation of TEEP protocol messages, Evidence generation, SUIT manifest processing, Wasm App validation, Catalog lookup, and Catalog/app promotion decisions are the responsibility of TEEP_Agent inside the TEE. QueryResponse/Success COSE_Sign1 signing in TEEP_Broker is discontinued; the Rust TEEP_Agent generates them using the development ESP256 signer. COSE_Sign1 validation in `internal/verifiedteep` is an intermediate REE-side implementation for development fixture/parser testing and is not considered a trusted application. The insecure demo key is for development only; in `attestam-verified`, only TEEP/COSE/SUIT messages validated by TEEP_Agent inside the TEE are used as the basis for applying Trusted Components. Ultimately, the Rust TEEP_Agent inside the TEE generates and validates COSE_Sign1 for TEEP messages and the SUIT authentication wrapper. The Rust implementation uses the `ciborium` crate for detailed CBOR operations and the `coset` crate for COSE structure processing. For cryptographic and signature operations required by `coset`, crates introduced by the RustCrypto project (<https://github.com/rustcrypto>) are the first choice, with an allowlist limited to algorithms supported by AttesTAM.
 

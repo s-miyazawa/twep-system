@@ -8,20 +8,38 @@ PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "${PROJECT_DIR}/../.." && pwd)
 TEEP_AGENT_WASM=${TWEP_TEEP_AGENT_WASM:-${REPO_ROOT}/build/teep-agent.wasm}
 GUEST_DIR=${TWEP_GUEST_DIR:-${PROJECT_DIR}/guest}
-TRUSTZONE_BUILD_DIR=${TWEP_TRUSTZONE_BUILD_DIR:-${REPO_ROOT}/build/twep-wr-trustzone}
+OPTEE_BUILD_DIR=${TWEP_OPTEE_BUILD_DIR:-${REPO_ROOT}/build/twep-wr-arm-optee}
+OPTEE_PLATFORM_BACKEND=${TWEP_OPTEE_PLATFORM_BACKEND:-arm-optee}
+case "${OPTEE_PLATFORM_BACKEND}" in
+	arm-optee|riscv-optee) ;;
+	*) echo "TWEP_OPTEE_PLATFORM_BACKEND must be arm-optee or riscv-optee" >&2; exit 2 ;;
+esac
 TARGET_GOARCH=${TARGET_GOARCH:-arm64}
-TEEC_EXPORT=${TEEC_EXPORT:-${HOME}/opt/optee/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr}
-TEEC_LIB_DIR=${TEEC_LIB_DIR:-${HOME}/opt/optee/out-br/build/optee_client_ext-1.0/libteec}
-HOST_CC=${HOST_CC:-${HOME}/opt/optee/out-br/host/bin/aarch64-buildroot-linux-gnu-gcc}
+OPTEE_ROOT=${OPTEE_ROOT:-${HOME}/opt/optee}
+OPTEE_GO_ROOT=${OPTEE_GO_ROOT:-${HOME}/opt/go-optee}
+TEEC_EXPORT=${TEEC_EXPORT:-${OPTEE_ROOT}/out-br/host/aarch64-buildroot-linux-gnu/sysroot/usr}
+TEEC_LIB_DIR=${TEEC_LIB_DIR:-${OPTEE_ROOT}/out-br/build/optee_client_ext-1.0/libteec}
+if [ -z "${HOST_CC:-}" ]; then
+	if [ -x "${OPTEE_ROOT}/out-br/host/bin/aarch64-linux-gcc" ]; then
+		HOST_CC=${OPTEE_ROOT}/out-br/host/bin/aarch64-linux-gcc
+	else
+		HOST_CC=${OPTEE_ROOT}/out-br/host/bin/aarch64-buildroot-linux-gnu-gcc
+	fi
+fi
 WAMR_ROOT_DIR=${WAMR_ROOT_DIR:-${HOME}/opt/wasm-micro-runtime}
 CMAKE=${CMAKE:-cmake}
-CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE:-}
+CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE:-${OPTEE_ROOT}/out-br/host/share/buildroot/toolchainfile.cmake}
 CMAKE_FRESH=${CMAKE_FRESH:-0}
 
+[ -d "${OPTEE_GO_ROOT}/src/runtime/cgo" ] || {
+	echo "missing safe Go cross-build root: ${OPTEE_GO_ROOT}; run make setup-optee-arm-v8" >&2
+	exit 1
+}
+
 make -C "${REPO_ROOT}" build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm build/negaposi.wasm build/catalog.dev.json build/catalog.dev.cbor
-set -- "${CMAKE}" -S "${REPO_ROOT}/lib/twep-wr" -B "${TRUSTZONE_BUILD_DIR}" \
+set -- "${CMAKE}" -S "${REPO_ROOT}/lib/twep-wr" -B "${OPTEE_BUILD_DIR}" \
 	-DWAMR_ROOT_DIR="${WAMR_ROOT_DIR}" \
-	-DTWEP_WR_PLATFORM_BACKEND=trustzone \
+	-DTWEP_WR_PLATFORM_BACKEND="${OPTEE_PLATFORM_BACKEND}" \
 	-DTWEP_WR_TEEC_EXPORT="${TEEC_EXPORT}" \
 	-DTWEP_WR_TEEC_LIB_DIR="${TEEC_LIB_DIR}"
 if [ "${CMAKE_FRESH}" = "1" ]; then
@@ -31,16 +49,16 @@ if [ -n "${CMAKE_TOOLCHAIN_FILE}" ]; then
 	set -- "$@" -DCMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE}"
 fi
 "$@"
-"${CMAKE}" --build "${TRUSTZONE_BUILD_DIR}"
+"${CMAKE}" --build "${OPTEE_BUILD_DIR}"
 
 rm -rf "${GUEST_DIR}"
 mkdir -p "${GUEST_DIR}/bin" "${GUEST_DIR}/build"
 mkdir -p "${GUEST_DIR}/fixtures"
-GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=1 CC="${HOST_CC}" \
+GOROOT="${OPTEE_GO_ROOT}" GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=1 CC="${HOST_CC}" \
 	CGO_CFLAGS="-I${REPO_ROOT}/lib/twep-wr/include" \
-	CGO_LDFLAGS="-L${TRUSTZONE_BUILD_DIR} -ltwep_wr -Wl,-rpath,/usr/lib -L${TEEC_LIB_DIR} -lteec" \
+	CGO_LDFLAGS="-L${OPTEE_BUILD_DIR} -ltwep_wr -Wl,-rpath,/usr/lib -L${TEEC_LIB_DIR} -lteec" \
 	go build -o "${GUEST_DIR}/bin/twepd" "${REPO_ROOT}/cmd/twepd"
-GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=0 \
+GOROOT="${OPTEE_GO_ROOT}" GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=0 \
 	go build -o "${GUEST_DIR}/bin/twep-cli" "${REPO_ROOT}/cmd/twep-cli"
 "${HOST_CC}" -Wall -Wextra -Werror \
 	-I"${REPO_ROOT}/lib/twep-wr/include" \
@@ -48,7 +66,7 @@ GOOS=linux GOARCH="${TARGET_GOARCH}" CGO_ENABLED=0 \
 	-I"${TEEC_EXPORT}/include" \
 	-o "${GUEST_DIR}/bin/twep_wr_public_abi_smoke" \
 	"${PROJECT_DIR}/host/public_abi_smoke.c" \
-	-L"${TRUSTZONE_BUILD_DIR}" -ltwep_wr \
+	-L"${OPTEE_BUILD_DIR}" -ltwep_wr \
 	-L"${TEEC_LIB_DIR}" -lteec \
 	-Wl,-rpath,/usr/lib -Wl,--allow-shlib-undefined
 cp "${TEEP_AGENT_WASM}" "${GUEST_DIR}/build/teep-agent.wasm"
@@ -59,7 +77,7 @@ cp "${REPO_ROOT}/build/catalog.dev.json" "${GUEST_DIR}/build/catalog.dev.json"
 cp "${REPO_ROOT}/build/catalog.dev.cbor" "${GUEST_DIR}/build/catalog.dev.cbor"
 cp "${REPO_ROOT}/testdata/images/input.jpg" "${GUEST_DIR}/fixtures/input.jpg"
 cp "${REPO_ROOT}/testdata/abi/vectors.hex" "${GUEST_DIR}/fixtures/abi-vectors.hex"
-cp "${TRUSTZONE_BUILD_DIR}/libtwep_wr.so" "${GUEST_DIR}/build/libtwep_wr.so"
+cp "${OPTEE_BUILD_DIR}/libtwep_wr.so" "${GUEST_DIR}/build/libtwep_wr.so"
 wat2wasm "${PROJECT_DIR}/wasm/infinite-app.wat" \
 	-o "${GUEST_DIR}/build/infinite-app.wasm"
 printf '%s' '0061736d01000000010401600000021a0103656e7612666f7262696464656e5f686f737463616c6c0000' | xxd -r -p >"${GUEST_DIR}/build/unsupported-import.wasm"
@@ -101,13 +119,22 @@ printf '%s' 'a0' | xxd -r -p >"${GUEST_DIR}/fixtures/verified-evidence-result-ma
 printf '%s' 'a0' | xxd -r -p >"${GUEST_DIR}/fixtures/protected-credential-store-malformed.cbor"
 printf '%s' 'a46a67656e65726174696f6e026e736368656d615f76657273696f6e0173636f6d706f6e656e745f73657175656e636573a078236c6173745f636f6e73756d65645f71756572795f726573706f6e73655f73686132353658200000000000000000000000000000000000000000000000000000000000000000' | xxd -r -p >"${GUEST_DIR}/fixtures/teep-acceptance-state-current-generation-2.cbor"
 teep_agent_sha256=$(sha256sum "${GUEST_DIR}/build/teep-agent.wasm" | awk '{print $1}')
+hex_text()
+{
+	value=$1
+	length=${#value}
+	[ "${length}" -lt 24 ] || { echo "CBOR fixture text is too long" >&2; exit 2; }
+	printf '%02x' "$((96 + length))"
+	printf '%s' "${value}" | od -An -tx1 -v | tr -d ' \n'
+}
+identity_prefix="a5$(hex_text schema_version)01$(hex_text platform_backend)$(hex_text "${OPTEE_PLATFORM_BACKEND}")$(hex_text runtime_location)$(hex_text optee-ta)$(hex_text teep_agent_location)$(hex_text optee-ta)$(hex_text measurement_sha256)"
 printf '%s%s%s' \
-	'a56e736368656d615f76657273696f6e0170706c6174666f726d5f6261636b656e646974727573747a6f6e657072756e74696d655f6c6f636174696f6e6c74727573747a6f6e652d746173746565705f6167656e745f6c6f636174696f6e6c74727573747a6f6e652d7461726d6561737572656d656e745f736861323536' \
+	"${identity_prefix}" \
 	'5820' \
 	"${teep_agent_sha256}" | xxd -r -p >"${GUEST_DIR}/fixtures/protected-agent-identity.cbor"
-printf '%s' 'a26e736368656d615f76657273696f6e0170706c6174666f726d5f6261636b656e646974727573747a6f6e65' | xxd -r -p >"${GUEST_DIR}/fixtures/protected-agent-identity-optional-missing.cbor"
+printf '%s' "a2$(hex_text schema_version)01$(hex_text platform_backend)$(hex_text "${OPTEE_PLATFORM_BACKEND}")" | xxd -r -p >"${GUEST_DIR}/fixtures/protected-agent-identity-optional-missing.cbor"
 printf '%s%s%s' \
-	'a56e736368656d615f76657273696f6e0170706c6174666f726d5f6261636b656e646974727573747a6f6e657072756e74696d655f6c6f636174696f6e6c74727573747a6f6e652d746173746565705f6167656e745f6c6f636174696f6e6c74727573747a6f6e652d7461726d6561737572656d656e745f736861323536' \
+	"${identity_prefix}" \
 	'5820' \
 	'0000000000000000000000000000000000000000000000000000000000000000' | xxd -r -p >"${GUEST_DIR}/fixtures/protected-agent-identity-mismatch.cbor"
 

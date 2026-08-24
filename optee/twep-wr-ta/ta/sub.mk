@@ -2,6 +2,14 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 global-incdirs-y += include
+
+TWEP_TA_PLATFORM_BACKEND ?= arm-optee
+ifneq ($(TWEP_TA_PLATFORM_BACKEND),arm-optee)
+ifneq ($(TWEP_TA_PLATFORM_BACKEND),riscv-optee)
+$(error TWEP_TA_PLATFORM_BACKEND must be arm-optee or riscv-optee)
+endif
+endif
+global-cppflags-y += -DTWEP_TA_PLATFORM_BACKEND=\"$(TWEP_TA_PLATFORM_BACKEND)\"
 srcs-y += twep_wr_ta.c
 srcs-y += ta_production_runtime.c
 srcs-y += ta_runtime_cbor.c

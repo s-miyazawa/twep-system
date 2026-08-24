@@ -1,5 +1,10 @@
 # OP-TEE Software Structure Diagrams
 
+Normal World selects the `arm-optee` or `riscv-optee` leaf and links the
+single `optee-common` implementation. The same profile is passed to the shared
+TA at compile time rather than inferred from architecture. Both profiles run
+the same platform-independent Rust TEEP Agent Wasm.
+
 This note maps the `optee/twep-wr-ta/` project at three levels:
 
 - Overview diagram: production public, direct TA smoke, and WAMR spike paths.
@@ -20,7 +25,7 @@ For a rendered SVG focused on the production `twepd -> cgo -> libtwep_wr.so
 
 | Path | Diagram meaning |
 | --- | --- |
-| Production public path | The user-facing TrustZone backend path: `twepd` calls `libtwep_wr.so` through `internal/twepwr`, and `libtwep_wr.so` invokes the TA through `libteec`. |
+| Production public path | The user-facing ARM OP-TEE or RISC-V OP-TEE path: `twepd` calls the selected profile's `libtwep_wr.so` through `internal/twepwr`, and the library invokes the shared TA through `libteec`. |
 | Direct TA smoke path | The `optee_example_twep_wr_ta` smoke client calls TA private commands directly through `libteec` to validate boundary behavior quickly. |
 | WAMR spike path | The regression-only `TA_TWEP_WR_CMD_WAMR_SPIKE_EXEC` command entrypoint. It shares the `TWEP_TA_WAMR_LINK=1` TA build with production TA WAMR, but is separate from production `twep_wr_execute`. |
 
@@ -42,7 +47,7 @@ flowchart LR
         cli["twep-cli"]
         twepd["twepd"]
         cgo["internal/twepwr\ncgo wrapper"]
-        libwr["libtwep_wr.so\nplatform/trustzone backend"]
+        libwr["libtwep_wr.so\nOP-TEE common + selected profile"]
         smokeapp["optee_example_twep_wr_ta\nhost/main.c smoke client"]
         publicabi["twep_wr_public_abi_smoke\nhost/public_abi_smoke.c"]
         teec["libteec / TEEC transport"]
@@ -226,7 +231,7 @@ flowchart TB
         smoke["invoke_ping()\ninvoke_platform_status()\ninvoke_secure_storage_smoke()\ninvoke_random_smoke()\ninvoke_time_smoke()\ninvoke_cbor_dry_run_smoke()"]
         putget["secure_storage_put()\nsecure_storage_get()"]
         prodraw["invoke_production_raw()"]
-        transport["trustzone_transport_execute()"]
+        transport["twep_wr_optee_execute()"]
         appsmoke["invoke_execute_helloworld()\ninvoke_execute_calcadd()\ninvoke_execute_negaposi()"]
         teepsmoke["invoke_teep_agent_resolve*()\ninvoke_teep_agent_hostcall_*()"]
         resumehost["invoke_host_io_resume()\nseed_host_io_pending()\ndrain_host_io_pending()"]
@@ -284,7 +289,7 @@ flowchart TB
   resume --> teepresolve
 ```
 
-`cmd_measure_wasm()` is invoked from `libtwep_wr.so` `platform/trustzone`, not
+`cmd_measure_wasm()` is invoked from `libtwep_wr.so` `platform/optee-common`, not
 from `host/main.c`. `read_protected` maps the protected object allowlist to
 OP-TEE REE FS Secure Storage. Generic TEEP_Agent writes to
 `teep-agent/verified-evidence-result.cbor` are rejected. The public REE Secure

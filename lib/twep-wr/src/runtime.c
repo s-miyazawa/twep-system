@@ -52,7 +52,7 @@ twep_wr_status_t twep_wr_init(
     ctx->default_timeout_ms = config->default_timeout_ms == 0 ? 5000u : config->default_timeout_ms;
     ctx->max_request_bytes = config->max_request_bytes;
     ctx->max_response_bytes = config->max_response_bytes;
-#ifndef TWEP_WR_PLATFORM_BACKEND_TRUSTZONE
+#ifndef TWEP_WR_PLATFORM_BACKEND_OPTEE
     if (!wasm_runtime_init()) {
         free(ctx->attestam_url);
         free(ctx->resolver_mode);
@@ -111,8 +111,8 @@ twep_wr_status_t twep_wr_execute(
     }
 
     twep_wr_status_t status;
-#ifdef TWEP_WR_PLATFORM_BACKEND_TRUSTZONE
-    status = twep_wr_trustzone_execute(ctx, request, out_response_cbor);
+#ifdef TWEP_WR_PLATFORM_BACKEND_OPTEE
+    status = twep_wr_optee_execute(ctx, request, out_response_cbor);
 #else
     status = twep_wr_run_app_wasm(ctx, request, out_response_cbor);
 #endif

@@ -1,6 +1,6 @@
 /* Copyright (c) 2026 SECOM CO., LTD. All rights reserved. */
 /* SPDX-License-Identifier: BSD-2-Clause */
-#include "trustzone_internal.h"
+#include "optee_internal.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -12,14 +12,14 @@
 
 #include <twep_wr_ta.h>
 
-#define TWEP_WR_TZ_READ_CAP (64u * 1024u)
+#define TWEP_WR_OPTEE_READ_CAP (64u * 1024u)
 
-static void trustzone_debug_io(const char *op, const char *path, int err)
+static void optee_debug_io(const char *op, const char *path, int err)
 {
     if (getenv("TWEP_WR_PLATFORM_DEBUG") == NULL) {
         return;
     }
-    fprintf(stderr, "twep-wr trustzone %s path=%s errno=%d\n",
+    fprintf(stderr, "twep-wr OP-TEE %s path=%s errno=%d\n",
             op != NULL ? op : "io",
             path != NULL ? path : "(null)",
             err);
@@ -39,7 +39,7 @@ twep_wr_platform_status_t twep_wr_platform_read_file(
 
     FILE *fp = fopen(path, "rb");
     if (fp == NULL) {
-        trustzone_debug_io("fopen-read", path, errno);
+        optee_debug_io("fopen-read", path, errno);
         return TWEP_WR_PLATFORM_ERR_IO;
     }
     if (fseek(fp, 0, SEEK_END) != 0) {
@@ -87,24 +87,24 @@ twep_wr_platform_status_t twep_wr_platform_write_file(
     }
     FILE *fp = fopen(path, "wb");
     if (fp == NULL) {
-        trustzone_debug_io("fopen-write", path, errno);
+        optee_debug_io("fopen-write", path, errno);
         return TWEP_WR_PLATFORM_ERR_IO;
     }
     if (data_len != 0 && fwrite(data, 1, data_len, fp) != data_len) {
-        trustzone_debug_io("fwrite", path, errno);
+        optee_debug_io("fwrite", path, errno);
         fclose(fp);
         return TWEP_WR_PLATFORM_ERR_IO;
     }
     if (fflush(fp) != 0 || fsync(fileno(fp)) != 0) {
-        trustzone_debug_io("flush-write", path, errno);
+        optee_debug_io("flush-write", path, errno);
         fclose(fp);
         return TWEP_WR_PLATFORM_ERR_IO;
     }
     if (fclose(fp) != 0) {
-        trustzone_debug_io("fclose-write", path, errno);
+        optee_debug_io("fclose-write", path, errno);
         return TWEP_WR_PLATFORM_ERR_IO;
     }
-    trustzone_debug_io("write-ok", path, 0);
+    optee_debug_io("write-ok", path, 0);
     return TWEP_WR_PLATFORM_OK;
 }
 
@@ -127,11 +127,11 @@ twep_wr_platform_status_t twep_wr_platform_write_file_atomic(
         return status;
     }
     if (rename(tmp_path, path) != 0) {
-        trustzone_debug_io("rename", path, errno);
+        optee_debug_io("rename", path, errno);
         unlink(tmp_path);
         return TWEP_WR_PLATFORM_ERR_IO;
     }
-    trustzone_debug_io("rename-ok", path, 0);
+    optee_debug_io("rename-ok", path, 0);
     return TWEP_WR_PLATFORM_OK;
 }
 
@@ -202,7 +202,7 @@ twep_wr_platform_status_t twep_wr_platform_sealed_read(
     uint8_t **out,
     size_t *out_len)
 {
-    twep_tz_session_t session;
+    twep_optee_session_t session;
     twep_wr_platform_status_t status;
     TEEC_Operation op;
     TEEC_Result res;
@@ -221,12 +221,12 @@ twep_wr_platform_status_t twep_wr_platform_sealed_read(
         return TWEP_WR_PLATFORM_ERR_IO;
     }
 
-    buf = (uint8_t *)malloc(TWEP_WR_TZ_READ_CAP);
+    buf = (uint8_t *)malloc(TWEP_WR_OPTEE_READ_CAP);
     if (buf == NULL) {
         return TWEP_WR_PLATFORM_ERR_NO_MEMORY;
     }
 
-    status = twep_tz_open(&session);
+    status = twep_optee_open(&session);
     if (status != TWEP_WR_PLATFORM_OK) {
         free(buf);
         return status;
@@ -239,14 +239,14 @@ twep_wr_platform_status_t twep_wr_platform_sealed_read(
     op.params[0].tmpref.buffer = (void *)object_name;
     op.params[0].tmpref.size = object_name_len;
     op.params[1].tmpref.buffer = buf;
-    op.params[1].tmpref.size = TWEP_WR_TZ_READ_CAP;
+    op.params[1].tmpref.size = TWEP_WR_OPTEE_READ_CAP;
 
     res = TEEC_InvokeCommand(&session.sess, TA_TWEP_WR_CMD_SECURE_STORAGE_GET,
                              &op, &origin);
-    twep_tz_close(&session);
+    twep_optee_close(&session);
     if (res != TEEC_SUCCESS) {
         free(buf);
-        return twep_tz_platform_status(res);
+        return twep_optee_platform_status(res);
     }
 
     *out_len = op.params[1].tmpref.size;
@@ -260,7 +260,7 @@ twep_wr_platform_status_t twep_wr_platform_sealed_write_atomic(
     const uint8_t *data,
     size_t data_len)
 {
-    twep_tz_session_t session;
+    twep_optee_session_t session;
     twep_wr_platform_status_t status;
     TEEC_Operation op;
     TEEC_Result res;
@@ -281,7 +281,7 @@ twep_wr_platform_status_t twep_wr_platform_sealed_write_atomic(
         return TWEP_WR_PLATFORM_ERR_IO;
     }
 
-    status = twep_tz_open(&session);
+    status = twep_optee_open(&session);
     if (status != TWEP_WR_PLATFORM_OK) {
         return status;
     }
@@ -297,7 +297,6 @@ twep_wr_platform_status_t twep_wr_platform_sealed_write_atomic(
 
     res = TEEC_InvokeCommand(&session.sess, TA_TWEP_WR_CMD_SECURE_STORAGE_PUT,
                              &op, &origin);
-    twep_tz_close(&session);
-    return twep_tz_platform_status(res);
+    twep_optee_close(&session);
+    return twep_optee_platform_status(res);
 }
-
