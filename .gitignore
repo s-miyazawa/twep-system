@@ -14,6 +14,8 @@ wasm/teep-agent/docs/book/
 *.local
 
 # Logs, temporary files, and editor/OS metadata
+__pycache__/
+*.py[cod]
 *.log
 *.tmp
 *.swp

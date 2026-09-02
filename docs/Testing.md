@@ -528,6 +528,15 @@ Store the following in `testdata/catalog/`.
 
 ## CI Policy
 
+SGX hardware uses `build-sgx-hw`. Hardware-independent regression uses the
+non-deployable `build-sgx-backend-tests`/`test-sgx-backend` harness; private
+protected-state, fake-QE, and transcript coverage uses
+`build-sgx-backend-test-hooks`/`test-sgx-backend-hooks`. Both test builds use
+SDK Simulation only as an internal transport and are not SGX runtime or
+security profiles. `check-sgx-test-hook-boundary` verifies that the private EDL
+does not enter the production build. The Wasm files under
+`build/sgx-backend-test-fixtures/` are non-distributable SGX backend
+negative-test fixtures and are not normal build artifacts.
 The following remains the lightweight, architecture-independent CI gate.
 
 ```sh

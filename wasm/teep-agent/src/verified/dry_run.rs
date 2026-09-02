@@ -146,4 +146,7 @@ pub(super) fn platform_status_text() -> Vec<u8> {
 pub(crate) fn optee_live_poc_acceptance_supported() -> bool {
     let platform_status = platform_status_text();
     optee_profile(&platform_status).is_some()
+        || (line_value_equals(&platform_status, b"platform-backend", b"sgx")
+            && line_value_equals(&platform_status, b"runtime-location", b"sgx-enclave")
+            && line_value_equals(&platform_status, b"teep-agent-location", b"sgx-enclave"))
 }

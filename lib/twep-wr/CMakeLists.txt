@@ -33,10 +33,25 @@ set(WAMR_BUILD_THREAD_MGR 0)
 set(WAMR_BUILD_REF_TYPES 1)
 set(WAMR_BUILD_INSTRUCTION_METERING 1)
 
-include(${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake)
-
 set(TWEP_WR_PLATFORM_BACKEND "linux" CACHE STRING "twep-wr platform backend")
 set_property(CACHE TWEP_WR_PLATFORM_BACKEND PROPERTY STRINGS linux arm-optee riscv-optee sgx keystone)
+option(TWEP_WR_SGX_BACKEND_TESTS
+  "Build non-deployable SGX backend tests using the SDK Simulation transport" OFF)
+option(TWEP_WR_SGX_TEST_HOOKS
+  "Build private SGX backend-test protected-state ECALLs" OFF)
+set(TWEP_WR_TEST_ARTIFACT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build" CACHE PATH
+    "Test-only Wasm and Catalog artifact directory")
+option(TWEP_WR_SGX_HW_DEBUG "Sign an HW debug Enclave with a disposable build-directory key" ON)
+set(TWEP_WR_SGX_SIGNED_ENCLAVE "" CACHE FILEPATH "Externally signed HW Enclave (required when HW debug signing is disabled)")
+set(TWEP_WR_SGX_SDK "/opt/intel/sgxsdk" CACHE PATH "Intel SGX SDK root")
+if(TWEP_WR_SGX_BACKEND_TESTS AND NOT TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
+  message(FATAL_ERROR
+    "TWEP_WR_SGX_BACKEND_TESTS requires TWEP_WR_PLATFORM_BACKEND=sgx")
+endif()
+if(TWEP_WR_SGX_TEST_HOOKS AND NOT TWEP_WR_SGX_BACKEND_TESTS)
+  message(FATAL_ERROR
+    "TWEP_WR_SGX_TEST_HOOKS requires TWEP_WR_SGX_BACKEND_TESTS=ON")
+endif()
 set(TWEP_WR_PLATFORM_SOURCE "")
 if(TWEP_WR_PLATFORM_BACKEND STREQUAL "linux")
   set(TWEP_WR_PLATFORM_SOURCE src/platform/linux/platform_linux.c)
@@ -66,21 +81,32 @@ elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
         ${TWEP_WR_OPTEE_PROFILE_SOURCE}
   )
 elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
-  message(FATAL_ERROR
-    "TWEP_WR_PLATFORM_BACKEND=sgx is unavailable until the complete secure SGX runtime layer")
+  # SGX keeps WAMR inside the Enclave.  Its sources and build details are
+  # attached to the common target after it is created.
+  set(TWEP_WR_PLATFORM_SOURCE "")
 elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "keystone")
   set(TWEP_WR_PLATFORM_SOURCE src/platform/keystone/platform_keystone.c)
 else()
   message(FATAL_ERROR "unsupported TWEP_WR_PLATFORM_BACKEND=${TWEP_WR_PLATFORM_BACKEND}")
 endif()
 
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
+  set(WAMR_RUNTIME_LIB_SOURCE "")
+else()
+  include(${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake)
+endif()
+
+set(TWEP_WR_RUNTIME_SOURCE
+  src/app_runtime.c src/catalog_resolver.c src/response_cbor.c
+  src/runtime.c src/teep_agent_runtime.c src/wasm_signature.c)
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
+  # The public adapter contains lifecycle and byte transport only.  In
+  # particular, do not compile a second REE WAMR runtime into libtwep_wr.so.
+  set(TWEP_WR_RUNTIME_SOURCE src/runtime.c)
+endif()
+
 add_library(twep_wr SHARED
-  src/app_runtime.c
-  src/catalog_resolver.c
-  src/response_cbor.c
-  src/runtime.c
-  src/teep_agent_runtime.c
-  src/wasm_signature.c
+  ${TWEP_WR_RUNTIME_SOURCE}
   ${TWEP_WR_PLATFORM_SOURCE}
   ${WAMR_RUNTIME_LIB_SOURCE}
 )
@@ -96,10 +122,6 @@ target_include_directories(twep_wr PRIVATE
   src
   ${WAMR_ROOT_DIR}/core/iwasm/include
 )
-
-if(TWEP_WR_PLATFORM_BACKEND STREQUAL "linux")
-  target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_LINUX=1)
-endif()
 
 if(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
    TWEP_WR_PLATFORM_BACKEND STREQUAL "riscv-optee")
@@ -118,6 +140,20 @@ if(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
   target_link_libraries(twep_wr PRIVATE teec)
 endif()
 
+target_compile_features(twep_wr PRIVATE c_std_11)
+target_compile_options(twep_wr PRIVATE -Wall -Wextra -Werror -fPIC)
+target_link_libraries(twep_wr PRIVATE m dl pthread rt crypto)
+
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
+  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/sgx.cmake")
+  twep_wr_configure_sgx_backend(
+    twep_wr "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "linux")
+  target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_LINUX=1)
+endif()
+
 if(TWEP_WR_PLATFORM_BACKEND STREQUAL "keystone")
   target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_KEYSTONE=1)
   enable_testing()
@@ -128,7 +164,3 @@ if(TWEP_WR_PLATFORM_BACKEND STREQUAL "keystone")
   target_link_libraries(platform_stub_test PRIVATE twep_wr)
   add_test(NAME platform_stub_test COMMAND platform_stub_test)
 endif()
-
-target_compile_features(twep_wr PRIVATE c_std_11)
-target_compile_options(twep_wr PRIVATE -Wall -Wextra -Werror -fPIC)
-target_link_libraries(twep_wr PRIVATE m dl pthread rt crypto)

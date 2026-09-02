@@ -12,18 +12,35 @@ internal pointers, Wasm memory pointers, or native runtime handles.
 - Buffers returned to Go are owned by C and must be released with
   `twep_wr_free_bytes`.
 
-The runtime selects exactly one platform backend at compile time and calls it
-directly; there is no runtime backend function table. Linux owns the REE WAMR
-lifecycle, OP-TEE invokes its TEEC execution helper, and the reserved Keystone
-backend fails initialization before WAMR starts. SGX selection is rejected at
-configure time until the complete secure runtime layer is present. Public C
-ABI v3 is unchanged.
+`twep_host_attestation_payload_format` is internal to `twep_teep_env`, not a
+public callback or ABI-v3 field. General applications cannot import it. Linux
+and the `arm-optee` and `riscv-optee` profiles provide Generic EAT. Keystone is
+an explicit stub whose public ABI initialization returns `TWEP_WR_ERR_INIT`
+before WAMR starts.
+Selecting `TWEP_WR_PLATFORM_BACKEND=sgx` builds the SGX hardware runtime.
+`TWEP_WR_SGX_BACKEND_TESTS=ON` instead creates a non-deployable backend-test
+harness that uses the SDK Simulation transport; it is not a runtime or security
+profile. Neither build falls back to REE execution.
+
+The inactive Agent public-key and ESP256 signing compatibility imports have
+been removed from the Wasm hostcall ABI. The Rust TEEP Agent owns and selects
+the fixed development key and signs QueryResponse/Success itself. Public C ABI
+v3 is unchanged.
+
+## SGX Private Implementation
+
+SGX hardware and private backend-test builds place WAMR only in the Enclave. The untrusted
+library supplies lifecycle and allowlisted byte transport; the Enclave owns
+TEEP Agent privilege, protected state, Catalog/app authorization, and app
+execution. This is private implementation behind unchanged public C ABI v3.
+See [the ABI](../../docs/ABI.md) for contracts and limits,
+[the security model](../../docs/Security.md) for trust boundaries, and
+[the test plan](../../docs/Testing.md) for backend-test commands.
 
 ## Source Layout
 
-- `src/runtime.c`: public ABI validation, compile-time backend dispatch,
-  context lifecycle, state layout, shared CBOR parsing helpers, and shared
-  WAMR app-call helpers.
+- `src/runtime.c`: public ABI validation, common context lifecycle, request and
+  response limits, state layout, and shared CBOR helpers.
 - `src/app_runtime.c`: general Trusted Wasm App loading, resource-limit
   application, app ABI calls, output extraction, and response assembly.
 - `src/catalog_resolver.c`: catalog lookup policy, TEEP_Agent resolve-app
@@ -34,8 +51,12 @@ ABI v3 is unchanged.
   output and app error output.
 - `src/runtime_internal.h`: private implementation boundary shared only by
   `src/*.c`.
-- `src/platform/`: backend-specific file, random, time, and protected-storage
-  primitives.
+- `src/platform/`: file, random, time, and protected-storage primitives plus
+  direct OP-TEE and SGX execution helpers. `runtime.c` selects exactly one
+  backend at compile time; only SGX retains opaque Enclave lifecycle state.
+
+The SGX trusted/untrusted boundary is fixed by the production and private test
+EDL files under `src/platform/sgx/enclave/`.
 
 OP-TEE is selected explicitly as `arm-optee` or `riscv-optee`. Both choices
 compile `src/platform/optee-common/` plus one minimal descriptor from

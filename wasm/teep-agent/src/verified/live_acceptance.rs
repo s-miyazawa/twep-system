@@ -9,6 +9,7 @@ pub(crate) fn accept_live_attestam_update_cose(
     evidence_query_response: &[u8],
     prior_session_token: &[u8],
 ) -> Result<LiveUpdateAcceptance, &'static [u8]> {
+    checkpoint(b"teep-update-received");
     if evidence_query_response.is_empty() || prior_session_token.is_empty() {
         return Err(b"verified PoC session binding input is missing");
     }
@@ -23,6 +24,7 @@ pub(crate) fn accept_live_attestam_update_cose(
     else {
         return Err(b"verified PoC Update COSE signature or message type was rejected");
     };
+    checkpoint(b"teep-cose-verified");
     if !host_io::write_file(VERIFIED_INPUT_COSE_PATH, input_cose)
         || !host_io::write_file(VERIFIED_INPUT_PAYLOAD_PATH, &payload)
     {
@@ -31,6 +33,8 @@ pub(crate) fn accept_live_attestam_update_cose(
     let Ok(candidate) = verified_update_candidate(&payload, requested_component_id) else {
         return Err(b"verified PoC Update candidate was rejected");
     };
+    checkpoint(b"teep-suit-parsed");
+    checkpoint(b"teep-payload-digest-verified");
     let suit_auth_status = mark_live_verified_update_candidate_state(
         &mut state,
         &candidate,
@@ -48,8 +52,8 @@ pub(crate) fn accept_live_attestam_update_cose(
     }
     let (binding_status, agent_identity_status, platform_status) =
         attestam_live_acceptance_context(Some(&kid));
-    if !state.fixture_verified() {
-        return Err(b"verified PoC Update protocol verification is incomplete");
+    if let Some(missing) = state.first_missing_step() {
+        return Err(missing.code());
     }
     if candidate.manifest_count != 1 || candidate.info.sequence_number == 0 {
         return Err(b"verified PoC Update manifest is not commit eligible");
@@ -58,7 +62,22 @@ pub(crate) fn accept_live_attestam_update_cose(
         return Err(b"verified PoC development trust anchors are not bound");
     }
     if !agent_identity_status.bound_ready(&platform_status) {
-        return Err(b"verified PoC TEEP Agent identity is not bound");
+        if agent_identity_status.load_status != AgentIdentityLoadStatus::LoadedUnbound {
+            return Err(b"teep.agent_identity_load");
+        }
+        if !agent_identity_status.backend_match {
+            return Err(b"teep.agent_identity_backend");
+        }
+        if !agent_identity_status.runtime_match {
+            return Err(b"teep.agent_identity_runtime");
+        }
+        if !agent_identity_status.teep_agent_match {
+            return Err(b"teep.agent_identity_location");
+        }
+        if !agent_identity_status.measurement_match_ready() {
+            return Err(b"teep.agent_identity_measurement");
+        }
+        return Err(b"teep.agent_identity_storage");
     }
     if !protected_final_storage_binding(&platform_status) {
         return Err(b"verified PoC protected storage is not commit capable");
@@ -125,9 +144,11 @@ pub(crate) fn accept_live_attestam_update_cose(
                 {
                     return Err(b"verified PoC app is not authorized by the protected Catalog");
                 }
+                checkpoint(b"teep-catalog-authorized");
                 let success_payload =
                     success_response_payload(&candidate.info, candidate.update_token)
                         .ok_or(b"verified PoC app Success could not be encoded".as_slice())?;
+                checkpoint(b"teep-commit-ready");
                 if !commit_attestam_app_evidence_result(
                     &state,
                     &candidate,
@@ -141,6 +162,14 @@ pub(crate) fn accept_live_attestam_update_cose(
         }
         ComponentKind::Unsupported => Err(b"verified PoC Update component is unsupported"),
     }
+}
+
+#[inline]
+fn checkpoint(message: &[u8]) {
+    #[cfg(feature = "sgx-test-hooks")]
+    host_io::log(1, message);
+    #[cfg(not(feature = "sgx-test-hooks"))]
+    let _ = message;
 }
 
 #[cfg(feature = "m9-1-acceptance-only-smoke")]

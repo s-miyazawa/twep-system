@@ -1,0 +1,69 @@
+enclave {
+    from "sgx_tstdc.edl" import *;
+    from "sgx_wamr.edl" import *;
+    trusted {
+        public int ecall_initialize([in, string] const char *resolver_mode,
+                                    [in, string] const char *attestam_url,
+                                    int insecure_demo_mode);
+        public void ecall_shutdown();
+        public int ecall_execute([in, string] const char *request_id,
+                                 [in, string] const char *command,
+                                 [in, size=input_len] uint8_t *input,
+                                 size_t input_len, uint32_t timeout_ms,
+                                 [out, size=output_cap] uint8_t *output,
+                                 size_t output_cap, [out] size_t *output_len);
+        public int ecall_test_transaction(
+                                 uint32_t operation,
+                                 [in, size=32] const uint8_t *query_digest,
+                                 [in, size=component_len] const uint8_t *component,
+                                 size_t component_len, uint64_t sequence,
+                                 uint64_t expected_generation,
+                                 [in, size=payload_len] const uint8_t *payload,
+                                 size_t payload_len,
+                                 [in, size=32] const uint8_t *payload_digest,
+                                 [out] uint64_t *new_generation);
+        public int ecall_test_evidence(
+                                 [in, size=challenge_len] const uint8_t *challenge,
+                                 size_t challenge_len,
+                                 [in, size=agent_key_len] const uint8_t *agent_key,
+                                 size_t agent_key_len,
+                                 [out, size=output_cap] uint8_t *output,
+                                 size_t output_cap,
+                                 [out] size_t *output_len);
+        public int ecall_test_transcript(uint32_t scenario);
+        public void ecall_test_agent_measurement([out, size=32] uint8_t *measurement);
+    };
+    untrusted {
+        int ocall_twep_read_artifact([in, string] const char *relative_path,
+                                     [out, size=buffer_cap] uint8_t *buffer,
+                                     size_t buffer_cap,
+                                     [out] size_t *artifact_len);
+        void ocall_twep_log([in, string] const char *message);
+        int ocall_twep_sealed_read([in, string] const char *object_name,
+                                   [out, size=buffer_cap] uint8_t *buffer,
+                                   size_t buffer_cap,
+                                   [out] size_t *blob_len);
+        int ocall_twep_sealed_write_atomic(
+                                   [in, string] const char *object_name,
+                                   [in, size=blob_len] const uint8_t *blob,
+                                   size_t blob_len);
+        int ocall_get_qe_target_info([out, size=target_info_len] uint8_t *target_info,
+                                     size_t target_info_len);
+        int ocall_get_quote_size([out] uint32_t *quote_size);
+        int ocall_get_quote([in, size=report_len] const uint8_t *report,
+                            size_t report_len,
+                            [out, size=quote_cap] uint8_t *quote,
+                            uint32_t quote_cap);
+        int ocall_twep_http_post([in, size=url_len] const uint8_t *url,
+                                 size_t url_len,
+                                 [in, size=body_len] const uint8_t *body,
+                                 size_t body_len,
+                                 [out, size=response_cap] uint8_t *response,
+                                 size_t response_cap,
+                                 [out] size_t *response_len);
+        int ocall_twep_write_diagnostic([in, size=path_len] const uint8_t *path,
+                                        size_t path_len,
+                                        [in, size=data_len] const uint8_t *data,
+                                        size_t data_len);
+    };
+};

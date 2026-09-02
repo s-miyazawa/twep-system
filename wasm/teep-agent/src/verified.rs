@@ -175,7 +175,8 @@ pub(super) fn optee_backend_name(platform_status: &[u8]) -> Option<&'static [u8]
 }
 
 fn protected_final_storage_binding(platform_status: &[u8]) -> bool {
-    optee_profile(platform_status).is_some()
+    (optee_profile(platform_status).is_some()
+        || line_value_equals(platform_status, b"platform-backend", b"sgx"))
         && (line_value_equals(
             platform_status,
             b"sealed-storage-security",

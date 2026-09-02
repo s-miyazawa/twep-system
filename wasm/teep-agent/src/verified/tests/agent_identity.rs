@@ -207,6 +207,21 @@ fn protected_agent_identity_measurement_equality_controls_binding() {
     assert!(!unavailable.bound_ready(platform_status));
 }
 
+#[test]
+fn protected_agent_identity_rejects_unknown_backend() {
+    let mut input = Vec::new();
+    cbor::write_map(&mut input, 2).unwrap();
+    cbor::write_text(&mut input, b"schema_version").unwrap();
+    cbor::write_uint(&mut input, 1).unwrap();
+    cbor::write_text(&mut input, b"platform_backend").unwrap();
+    cbor::write_text(&mut input, b"unknown-backend").unwrap();
+
+    let platform_status = b"platform-backend=arm-optee\n";
+    let status = protected_agent_identity_status_from_cbor(&input, platform_status, None);
+    assert!(!status.backend_match);
+    assert!(!status.bound_ready(platform_status));
+}
+
 fn protected_identity(profile: &[u8], location: &[u8]) -> Vec<u8> {
     let mut input = Vec::new();
     cbor::write_map(&mut input, 5).unwrap();

@@ -66,9 +66,11 @@ pub(super) fn agent_identity_status_text(
 ) -> Vec<u8> {
     let optee = optee_profile(platform_status);
     let optee_backend = optee_backend_name(platform_status);
+    let is_sgx = line_value_equals(platform_status, b"platform-backend", b"sgx")
+        && line_value_equals(platform_status, b"runtime-location", b"sgx-enclave")
+        && line_value_equals(platform_status, b"teep-agent-location", b"sgx-enclave");
     let is_linux = line_value_equals(platform_status, b"platform-backend", b"linux");
-    let ta_runtime = optee.is_some();
-    let ta_agent = optee.is_some();
+    let protected_runtime = optee.is_some() || is_sgx;
     let rollback_false = line_value_equals(
         platform_status,
         b"sealed-storage-rollback-protected",
@@ -79,26 +81,32 @@ pub(super) fn agent_identity_status_text(
         b"sealed-storage-rollback-protected",
         b"true",
     );
-    let agent_observed = is_linux || optee.is_some();
+    let agent_observed = is_linux || protected_runtime;
 
     let mut out = Vec::new();
     out.extend_from_slice(b"agent-identity-model-ready=true\nplatform-backend=");
     if let Some(backend) = optee_backend {
         out.extend_from_slice(backend);
+    } else if is_sgx {
+        out.extend_from_slice(b"sgx");
     } else if is_linux {
         out.extend_from_slice(b"linux");
     } else {
         out.extend_from_slice(b"unknown");
     }
     out.extend_from_slice(b"\nruntime-location=");
-    if ta_runtime {
-        out.extend_from_slice(optee.unwrap().1);
+    if let Some(profile) = optee {
+        out.extend_from_slice(profile.1);
+    } else if is_sgx {
+        out.extend_from_slice(b"sgx-enclave");
     } else {
         out.extend_from_slice(b"unknown");
     }
     out.extend_from_slice(b"\nteep-agent-location=");
-    if ta_agent {
-        out.extend_from_slice(optee.unwrap().1);
+    if let Some(profile) = optee {
+        out.extend_from_slice(profile.1);
+    } else if is_sgx {
+        out.extend_from_slice(b"sgx-enclave");
     } else {
         out.extend_from_slice(b"unknown");
     }
@@ -113,6 +121,8 @@ pub(super) fn agent_identity_status_text(
     out.extend_from_slice(b"\nagent-identity-source=");
     if optee.is_some() {
         out.extend_from_slice(b"platform-status-ta-local");
+    } else if is_sgx {
+        out.extend_from_slice(b"platform-status-enclave-local");
     } else if is_linux {
         out.extend_from_slice(b"platform-status-linux");
     } else {

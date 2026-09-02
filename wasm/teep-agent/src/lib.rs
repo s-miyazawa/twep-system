@@ -34,9 +34,15 @@ use suit::twep_app_component_id;
 
 struct BumpAllocator;
 
-#[cfg(not(test))]
+#[cfg(all(
+    not(test),
+    any(not(feature = "sgx-test-hooks"), feature = "heap-512k-diagnostic")
+))]
 const HEAP_SIZE: usize = 512 * 1024;
-#[cfg(test)]
+#[cfg(any(
+    test,
+    all(feature = "sgx-test-hooks", not(feature = "heap-512k-diagnostic"))
+))]
 const HEAP_SIZE: usize = 2 * 1024 * 1024;
 
 #[repr(align(16))]
@@ -44,6 +50,8 @@ struct Heap([u8; HEAP_SIZE]);
 
 static mut HEAP: Heap = Heap([0; HEAP_SIZE]);
 static NEXT: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "sgx-test-hooks")]
+static PEAK: AtomicUsize = AtomicUsize::new(0);
 
 unsafe impl GlobalAlloc for BumpAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -60,7 +68,11 @@ unsafe impl GlobalAlloc for BumpAllocator {
                 return ptr::null_mut();
             }
             match NEXT.compare_exchange(current, next, Ordering::SeqCst, Ordering::Relaxed) {
-                Ok(_) => return addr_of_mut!(HEAP.0).cast::<u8>().add(aligned),
+                Ok(_) => {
+                    #[cfg(feature = "sgx-test-hooks")]
+                    PEAK.fetch_max(next, Ordering::Relaxed);
+                    return addr_of_mut!(HEAP.0).cast::<u8>().add(aligned);
+                }
                 Err(v) => current = v,
             }
         }
@@ -88,6 +100,13 @@ pub extern "C" fn twep_app_alloc(len: u32) -> u32 {
 
 #[no_mangle]
 pub extern "C" fn twep_app_free(_ptr: u32, _len: u32) {}
+
+/// Private test-hook observation; absent from production Wasm artifacts.
+#[cfg(feature = "sgx-test-hooks")]
+#[no_mangle]
+pub extern "C" fn twep_test_heap_peak_bytes() -> u32 {
+    PEAK.load(Ordering::Relaxed) as u32
+}
 
 const TARGET_COMMAND_KEY: &[u8] = b"target_command";
 const RESOLVER_MODE_KEY: &[u8] = b"resolver_mode";
