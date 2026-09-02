@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 m9-1-acceptance-only-smoke = []
 # Private diagnostics used only by the non-deployable SGX backend-test build.
 sgx-test-hooks = []
-# Reproduce the production heap boundary in the SGX diagnostic artifact.
+# Reproduce the former production heap boundary without changing production.
 heap-512k-diagnostic = []
 
 [dependencies]
