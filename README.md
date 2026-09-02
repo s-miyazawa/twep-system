@@ -1,7 +1,7 @@
 # twep
 
 `twep` (Trusted Wasm Execution Platform) runs Trusted Wasm Apps from
-`twep-cli` through `twepd`, the `twep-wr` C ABI boundary, WAMR, and Rust
+`twep-cli` through `twepd`, the `twep-wr` public C ABI v3 boundary, WAMR, and Rust
 `no_std` Wasm applications.
 
 The Go module and intended public repository path are
@@ -16,14 +16,17 @@ twep-cli calcadd 3 4 5
 twep-cli negaposi -i testdata/images/medium.jpg -o /tmp/twep-output.jpg
 ```
 
-The platform has two primary backends:
+The platform has four implemented profiles:
 
 - The plain Linux backend runs WAMR in the REE process and provides a direct
   development, integration, and test environment.
-- The TrustZone (OP-TEE) backend preserves the same public C ABI while running
-  the TEEP Agent, Catalog resolution, and Trusted Wasm Apps in TA-local WAMR.
+- The ARM and RISC-V OP-TEE profiles preserve the same public C ABI while
+  running the TEEP Agent, Catalog resolution, and Trusted Wasm Apps in
+  TA-local WAMR.
+- The SGX hardware runtime preserves that ABI and runs WAMR inside the
+  Enclave. SGX HW uses DCAP Quote3 Evidence with Intel QVL.
 
-Both backends use the same `no_std` Wasm binaries and the same CBOR application
+All profiles use the same `no_std` Wasm binaries and the same CBOR application
 ABI. Platform-specific behavior is implemented behind the `twep-wr` boundary.
 
 The following diagram shows the TrustZone (OP-TEE) backend, including the
@@ -91,6 +94,11 @@ The TrustZone backend has a separate OP-TEE build and QEMU smoke suite. See
 [optee/twep-wr-ta/README.md](optee/twep-wr-ta/README.md) for the required
 OP-TEE environment, `make build-optee-trustzone`, and the TrustZone smoke
 targets.
+
+SGX hardware is the only deployable SGX runtime and never falls back to REE
+WAMR. Private backend tests use SDK Simulation only as an internal transport. See
+[docs/sgx/Backend.md](docs/sgx/Backend.md) for the backend profile and
+[docs/sgx/README.md](docs/sgx/README.md) for the hardware walkthrough.
 
 For the `arm-optee` profile, the repository can prepare the official OP-TEE
 4.8.0 QEMU v8 environment, its AArch32/AArch64 toolchains, Buildroot SDK,

@@ -4,6 +4,11 @@ The OP-TEE backend is split into explicit `arm-optee` and `riscv-optee`
 profiles over shared `optee-common` code. TA and Normal World receive the same
 selected profile; public C ABI remains version 3.
 
+The C runtime selects Linux, OP-TEE, SGX, or Keystone at compile time and
+calls the implementation directly. Public C ABI v3 is unchanged; the two
+inactive Agent-key compatibility imports were removed from the Wasm hostcall
+ABI while Evidence-format selection remains supported.
+
 This page is the short index for current behavior. It is not a forward-looking
 implementation plan. Read the linked canonical documents for normative details
 and read `Spec.md` separately for the product target.
@@ -21,3 +26,4 @@ and read `Spec.md` separately for the product target.
 | M9.3 | Complete academic single-app path: obtains one app TC, authorizes its command and digest with the protected Catalog, protects and reloads the app, executes it in TA-local WAMR, and retains `final-verified=false`. | `docs/ABI.md`, `docs/Security.md`, `Spec.md` | TEEP Agent verified coordinator, TA protected app state and app runtime | `smoke-optee-trustzone-attestam-verified-app`, Rust authorization/commit tests |
 | M10 | Regression checkpoint available: representative production-path build and smoke coverage; it is not a claim that production credential infrastructure exists. | `docs/Testing.md` | repository build and smoke targets | M10 checkpoint plus slice-specific negative and regression targets |
 | RISC-V OP-TEE v9 | Port implemented through M9.3: the public C ABI v3 normal-world stack and WAMR-enabled TA cross-build for RV64 LP64D run on the v9 OpenSBI/Linux/OP-TEE image without architecture-specific Wasm artifacts; live AttesTAM/Veraison, protected Catalog/app, restart, replay, and publication-fault paths are covered. | `README.md`, `docs/AttesTAM.md`, `docs/Testing.md`, `docs/Security.md` | RV64 build/package/live runners, `riscv-optee` backend, TA WAMR and protected state | baseline plus `smoke-optee-riscv-v9-attestam-{live,verified-catalog,verified-app}`, including kernel health and clean poweroff |
+| SGX hardware | Implemented: Enclave-local WAMR, sealed acceptance/Catalog/one-active-app state, offline restart execution, and DCAP Quote3/QVL AttesTAM flow; fixed credentials retain `final-verified=false`. SDK Simulation is private backend-test transport only. | `docs/sgx/Backend.md`, `docs/ABI.md`, `docs/Security.md` | `lib/twep-wr/src/platform/sgx/` | SGX backend CTest and hardware AttesTAM app/restart smokes |

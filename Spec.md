@@ -4,7 +4,7 @@
 
 twep enables a User to acquire, update, load, and execute Trusted Wasm Apps through `twep-cli`, with AttesTAM integration for TEEP-based provisioning.
 
-The platform has three implemented profiles: plain Linux (Ubuntu 24.04), ARM OP-TEE, and RISC-V OP-TEE. The Linux backend runs WAMR in the REE process for development, integration, and testing. Both OP-TEE profiles preserve the same public `twep-wr` C ABI while running the TEEP Agent, Catalog resolution, and Trusted Wasm Apps in WAMR inside the TA. All profiles run the same platform-independent Wasm binaries. SGX and Keystone remain portability boundaries rather than implemented backends.
+The platform has four implemented profiles: plain Linux (Ubuntu 24.04), ARM OP-TEE, RISC-V OP-TEE, and SGX hardware. Linux runs WAMR in the REE, OP-TEE runs it in the TA, and SGX runs it in the Enclave. All profiles preserve public C ABI v3 and run the same platform-independent Wasm binaries. Keystone remains a portability boundary. SDK Simulation is used only by a private, non-deployable SGX backend-test harness.
 
 ## Confirmed Key Policies
 
@@ -91,13 +91,13 @@ $ twep-cli negaposi -i image.jpg -o output.jpg
 - Implements the export ABI and hostcall ABI for Rust/Wasm apps.
 - Exposes only the C ABI to Go.
 - Does not expose WAMR internal types, Wasm memory pointers, or native handles to Go.
-- Separates platform-dependent processing into `lib/twep-wr/src/platform/<backend>/`. The implemented primary backends are `linux`, `arm-optee`, and `riscv-optee`; both OP-TEE profiles share `platform/optee-common`, while `sgx` and `keystone` remain unsupported portability boundaries. `platform/linux` is an REE-only development backend and is not used for final verified security claims. OP-TEE adopts REE FS Secure Storage and treats `CFG_REE_FS=y` and `CFG_RPMB_FS=n` as permanent settings. This repository does not include rollback attacks in its threat model, and `sealed-storage-rollback-protected=false` does not by itself block the documented verified protocol checks.
+- Separates platform-dependent processing into `lib/twep-wr/src/platform/<backend>/`. ARM and RISC-V OP-TEE share `platform/optee-common`; SGX hardware uses Enclave-local WAMR and measurement-bound sealed records; Keystone remains fail-closed. Linux is REE-only. OP-TEE adopts REE FS Secure Storage. Rollback attacks remain outside this PoC threat model.
 
 ### TEEP_Agent Trusted Wasm App
 
 - Communicates with AttesTAM using TEEP to acquire, update, and install the Catalog File and Trusted Wasm Apps.
 - The TEEP_Agent itself is the root-side component that verifies the Catalog File and Trusted Wasm Apps. The TrustZone TA verifies its `role="teep-agent"` ESP256 code signature before WAMR load or privileged-hostcall registration. Initial final verified mode does not support self-update through AttesTAM; measurement or pinning is delegated to the platform root of trust.
-- The Generic EAT format is authoritative for Evidence, and the implementation integrates with the Veraison Generic EAT verifier. The Rust TEEP_Agent generates it with a separate fixed ES256 development key embedded in the Wasm binary. That private key is public and forgeable, so it is not a hardware-protected or production credential and cannot establish `final-verified=true`. Hardware-specific evidence/key binding, such as SGX DCAP quotes, OP-TEE hardware unique keys, and RPMB-derived freshness, is outside the repository's verified protocol profile.
+- Evidence is backend-selected. Linux and OP-TEE use Generic EAT generated and signed by the Rust TEEP_Agent with a fixed development ES256 key. SGX hardware supplies the canonical DCAP Quote3 bundle and binds the challenge and Agent public key. Both paths retain `final-verified=false`; fake QE Evidence exists only in the private backend-test harness.
 - Reads and writes the Catalog File stored in a special directory on the Local File System.
 - Resolves a Trusted Wasm App from a command name.
 - Verifies a Wasm app's hash, version, and component ID as necessary.

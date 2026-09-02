@@ -14,8 +14,9 @@ revisions:
 `testdata/compat/upstream-revisions.env` is the machine-readable record. The
 read-only `scripts/compat/resolve-upstream-revisions.sh` helper reports newer
 remote heads; it does not silently change this reviewed baseline.
-These WAMR revisions record that audit and do not constrain future backend
-builds. A backend must document and test its own accepted WAMR source layout.
+These WAMR revisions record that audit and do not constrain current SGX
+builds. Current `WAMR_DIR` acceptance is based on the required `linux-sgx`
+source layout and successful configure, build, and smoke execution.
 
 ## AttesTAM wire contract
 
@@ -60,8 +61,9 @@ COSE QueryResponse is independently rejected above 32 KiB.
 
 For the recorded historical baseline, the media type came from the TEEP-Agent-only
 `twep_host_attestation_payload_format` hostcall. General applications cannot
-import it. Linux and TA-local TrustZone provide Generic EAT, while other
-backends return unsupported at this PR boundary.
+import it. Linux and TA-local TrustZone provided Generic EAT, while SGX and
+Keystone returned unsupported. Current SGX HW instead implements the canonical
+Quote3 contract in `docs/ABI.md`; fake QE bundles are private backend-test data.
 This historical baseline does not change public C ABI v3, `trustzone`, protected-app,
 protected acceptance, D046 token binding, protected Catalog publication, resolver-mode distinctions, or `final-verified=false`.
 
@@ -117,9 +119,8 @@ Go 1.22.0, rustc/cargo 1.95.0, GCC 11.4.0, CMake 3.22.1, Linux
   permission).
 - PASS: TEEP Agent host and wasm32 clippy with warnings denied, host tests,
   wasm32 release build, and formatting check.
-- PASS: Linux and reserved SGX/Keystone platform translation units; OP-TEE
-  static smoke mapping; pinned AttesTAM `internal/tam` and `internal/server`
-  tests.
+- PASS: Linux, SGX, and Keystone platform translation units; OP-TEE static
+  smoke mapping; pinned AttesTAM `internal/tam` and `internal/server` tests.
 - NOT RUN: TrustZone/QEMU build and runtime smokes because `optee_postrun.py`,
   the configured Buildroot cross-toolchain, and `qemu-system-aarch64` were each
   absent.

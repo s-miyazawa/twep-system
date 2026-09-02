@@ -1,0 +1,400 @@
+<mxfile host="65bd71144e">
+    <diagram id="sgx-hw-editable" name="Page-1">
+        <mxGraphModel dx="5929" dy="1954" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2960" pageHeight="1500" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=none;strokeWidth=1;" parent="1" vertex="1">
+                    <mxGeometry x="-870" y="2.06" width="3080" height="1517.94" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="TWEP Intel SGX HW Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=42;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="158.36000000000013" y="12.64" width="805.2" height="63" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef7ff;strokeColor=#66a5e3;strokeWidth=3;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="130" width="960" height="1290" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff1ef;strokeColor=#eb7b70;strokeWidth=3;" parent="1" vertex="1">
+                    <mxGeometry x="1150" y="130" width="960" height="1290" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="Untrusted Host / REE" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=32;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="319.6" y="152.44" width="420.8" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="runs the CLI and daemon · delivers data · stores Enclave files" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=19;fontStyle=0;fontColor=#5d6877;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="141.04" y="203.48" width="777.92" height="28.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="Intel SGX Enclave" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=32;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1449.36" y="152.44" width="361.28" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="verifies Updates · protects execution authorization · runs approved apps" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=19;fontStyle=0;fontColor=#5d6877;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1205.7" y="203.48" width="848.6" height="28.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#738292;strokeWidth=3.0;dashed=1;dashPattern=12 10;endArrow=none;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1080" y="140" as="sourcePoint"/>
+                        <mxPoint x="1080" y="1390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="12" value="SGX trust boundary" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="978.72" y="140.72" width="202.56" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f2ff;strokeColor=#3c83cf;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="85" y="275" width="185" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="twep-cli" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="107.96" y="290.16" width="138.08" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="user command" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="98.04" y="328.56" width="157.92" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f2ff;strokeColor=#3c83cf;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="275" width="185" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="twepd" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="374.35" y="290.16" width="95.3" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="Go daemon" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="359.78" y="328.56" width="124.44" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f5e7;strokeColor=#4a9a55;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="575" y="275" width="230" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="internal/twepwr" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="571.05" y="290.16" width="237.9" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="cgo wrapper" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="616.62" y="328.56" width="146.76" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="270" y="325" as="sourcePoint"/>
+                        <mxPoint x="320" y="325" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="23" value="UDS + CBOR" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="233.4" y="283.72" width="123.2" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="515" y="325" as="sourcePoint"/>
+                        <mxPoint x="565" y="325" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="25" value="cgo" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="500" y="283.72" width="80" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eee5fa;strokeColor=#7a58bd;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="195" y="445" width="350" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" value="libtwep_wr.so" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="158.36" y="463.16" width="423.28" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="public C ABI v3" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="274.3" y="502.56" width="191.4" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" value="Enclave lifecycle + OCALL handlers" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="189.36" y="532.72" width="361.28" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ba9b8;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="660" y="455" width="260" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="Intel SGX URTS" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="678.18" y="472.16" width="223.64" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="untrusted runtime" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="683.14" y="510.56" width="213.72" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="690" y="375" as="sourcePoint"/>
+                        <mxPoint x="370" y="435" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="690" y="410"/>
+                            <mxPoint x="370" y="410"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="34" value="twep_wr_execute()" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="428.68" y="383.72" width="192.64" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="35" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586b78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="545" y="507" as="sourcePoint"/>
+                        <mxPoint x="650" y="507" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="36" value="SGX API" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="551.28" y="468.72" width="93.44" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="37" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffdcd7;strokeColor=#df5549;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="285" width="700" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="38" value="Enclave request controller" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1368.45" y="301.16" width="523.1" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="39" value="runs Agent resolution/update, then approved app execution" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1344.58" y="338.56" width="570.84" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="41" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="920" y="507" as="sourcePoint"/>
+                        <mxPoint x="1270" y="345" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="979.44" y="490.152"/>
+                            <mxPoint x="1033.12" y="449.976"/>
+                            <mxPoint x="1092.08" y="402.024"/>
+                            <mxPoint x="1167.36" y="361.848"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="146" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;ECALL&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="41" vertex="1" connectable="0">
+                    <mxGeometry x="-0.064" y="-1" relative="1" as="geometry">
+                        <mxPoint y="-1" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="44" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#7a58bd;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1210" y="485" width="840" height="265" as="geometry"/>
+                </mxCell>
+                <mxCell id="45" value="Wasm runtime inside Enclave" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1489.66" y="498.16" width="280.68" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="46" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eee5fa;strokeColor=#7a58bd;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1245" y="555" width="355" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="47" value="TEEP Agent" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1238.88" y="569.16" width="366.24" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="48" value="verifies signed TEEP / SUIT Updates" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1265.04" y="606.56" width="313.92" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="49" value="updates approved app information" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1231.44" y="635.56" width="381.12" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="51" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0cf;strokeColor=#de8a00;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1660" y="555" width="355" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="52" value="general app runtime" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1689.53" y="569.16" width="294.94" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="53" value="reloads the protected app" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1629.7" y="606.56" width="414.6" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="54" value="executes only an app approved by the Agent" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1652.02" y="635.56" width="369.96" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="55" value="twep-app-v1 Wasm ABI; no hostcalls" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1656.36" y="666.72" width="361.28" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="56" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" source="37" target="46" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1422" y="405" as="sourcePoint"/>
+                        <mxPoint x="1422" y="530" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="57" value="resolve app; install update if needed" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1442" y="445" width="280" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="58" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" source="37" target="51" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1949" y="405" as="sourcePoint"/>
+                        <mxPoint x="1949" y="555" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="2015" y="440"/>
+                            <mxPoint x="2015" y="520"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="59" value="execute approved app" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1857" y="445" width="185" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="60" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ba9b8;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="674.56" width="420" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="61" value="Host-supplied Agent artifact" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="690.72" width="400" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="62" value="signed TEEP Agent Wasm · fixed allowed path&#xa;Enclave C verifies it before the Agent starts" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="737.38" width="400" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="64" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ba9b8;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="676.8" y="689.56" width="250" height="135" as="geometry"/>
+                </mxCell>
+                <mxCell id="65" value="HTTP/TLS transport" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="671.8" y="705.7199999999999" width="260" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="66" value="bounded request / response" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="644.7199999999999" y="743.1199999999999" width="314.16" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="67" value="exact URL policy in Enclave" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="655.88" y="775.28" width="291.84" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="72" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586b78;strokeWidth=4.0;endArrow=block;endFill=1;entryX=0.75;entryY=0;entryDx=0;entryDy=0;fontFamily=Arial;fontSize=16;fontColor=#465362;labelBackgroundColor=#f8fafc;" parent="1" target="60" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1280" y="385" as="sourcePoint"/>
+                        <mxPoint x="950" y="720" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="1210" y="430"/>
+                            <mxPoint x="1130" y="500"/>
+                            <mxPoint x="970" y="590"/>
+                            <mxPoint x="760" y="620"/>
+                            <mxPoint x="435" y="620"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="147" value="OCALL" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=15;" parent="72" vertex="1" connectable="0">
+                    <mxGeometry x="-0.4238" y="-5" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="76" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eee5fa;strokeColor=#7a58bd;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1170" y="824.56" width="230" height="125.44" as="geometry"/>
+                </mxCell>
+                <mxCell id="77" value="Enclave hostcall services&lt;br&gt;&lt;font style=&quot;font-size: 16px; font-weight: normal;&quot;&gt;HTTP request / response · Quote3: challenge + Agent key&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1175" y="831" width="225" height="79" as="geometry"/>
+                </mxCell>
+                <mxCell id="132" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f4f5f7;strokeColor=#738292;strokeWidth=3;dashed=1;dashPattern=12 10;" parent="1" vertex="1">
+                    <mxGeometry x="-780" y="179.32" width="730" height="1255" as="geometry"/>
+                </mxCell>
+                <mxCell id="133" value="External Attestation Services" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=32;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-680" y="201.76" width="530" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="134" value="outside twep-system and SGX trust boundary" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=19;fontStyle=0;fontColor=#5d6877;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-720" y="252.79999999999998" width="610" height="28.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="85" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f2ff;strokeColor=#3c83cf;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="-700" y="809.32" width="610" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="86" value="AttesTAM" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-500" y="826.48" width="210" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="87" value="manages the live TEEP session" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-650" y="873.88" width="510" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="88" value="returns a signed Update after attestation" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-615" y="915.88" width="440" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="91" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" source="85" target="135" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="-395" y="999.32" as="sourcePoint"/>
+                        <mxPoint x="-395" y="1099.32" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="92" value="Quote3 appraisal" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-375" y="1037.04" width="180" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="94" value="TEEP over HTTP/TLS · opaque byte transport" style="text;html=1;strokeColor=none;fillColor=#f8fafc;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="950" width="500" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="95" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4a9a55;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1220" y="1070" width="810" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="96" value="Enclave-protected app authorization state" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1406.23" y="1087.16" width="473.77" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="97" value="accepted update history · active protected Catalog · one installed app" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1222.4" y="1126.56" width="805.2" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="98" value="Enclave C validates each dedicated commit request" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1200.08" y="1158.56" width="849.84" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="99" value="writes inactive slot · reads back and verifies · activates protected state" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1211.24" y="1194.72" width="827.52" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="100" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1422" y="710" as="sourcePoint"/>
+                        <mxPoint x="1422" y="1060" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="101" value="request protected Catalog / app commit" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1428.9" y="893.5600000000001" width="350" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="102" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1837" y="1060" as="sourcePoint"/>
+                        <mxPoint x="1837" y="710" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="103" value="load and check approved app" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1720" y="842.5600000000001" width="232.32" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="104" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ba9b8;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="1120" width="800" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="105" value="Host storage for sealed Enclave data" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="251.32" y="1137.16" width="537.36" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="106" value="stores opaque sealed blobs only · fixed names · atomic writes" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="106.24" y="1175.56" width="827.52" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="108" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;startArrow=block;startFill=1;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1220" y="1160" as="sourcePoint"/>
+                        <mxPoint x="930" y="1160" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="149" value="OCALL:&lt;br&gt;&amp;nbsp;read / write opaque sealed blobs" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=15;labelBackgroundColor=#f8fafc;" parent="108" vertex="1" connectable="0">
+                    <mxGeometry x="0.0023" y="1" relative="1" as="geometry">
+                        <mxPoint x="5" y="-27" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="113" value="REE supplies bytes and availability only; it is never a Catalog or execution authorization authority." style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=1;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="7.04" y="1260.72" width="1025.92" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="129" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586b78;strokeWidth=4.0;endArrow=block;endFill=1;exitX=0;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="77" target="65" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1258.86592" y="541.6850000000002" as="sourcePoint"/>
+                        <mxPoint x="889.8" y="584.78" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="1110" y="800"/>
+                            <mxPoint x="1000" y="760"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="148" value="OCALL" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=15;" parent="129" vertex="1" connectable="0">
+                    <mxGeometry x="-0.0776" y="-2" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="135" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d94236;strokeWidth=2.4;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="-700" y="1099.32" width="610" height="155" as="geometry"/>
+                </mxCell>
+                <mxCell id="136" value="Intel QVL" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=23;fontStyle=1;fontColor=#17202d;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-500" y="1116.48" width="210" height="34.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="137" value="verifies the SGX Quote3" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-575" y="1159.8799999999999" width="360" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="138" value="uses Intel DCAP collateral" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=18;fontStyle=0;fontColor=#3e4a59;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="-620" y="1199.8799999999999" width="450" height="27" as="geometry"/>
+                </mxCell>
+                <mxCell id="143" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1300" y="714.56" as="sourcePoint"/>
+                        <mxPoint x="1300.42" y="824.56" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="152" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586B78;strokeWidth=4.0;endArrow=block;endFill=1;" parent="1" source="46" target="37" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1368.45" y="517.72" as="sourcePoint"/>
+                        <mxPoint x="1368.45" y="407.72" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="1368.45" y="477.28"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="151" value="return approved app info" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=16;fontStyle=0;fontColor=#465362;spacing=0;" parent="1" vertex="1">
+                    <mxGeometry x="1215" y="448.16" width="180" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="153" value="" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;strokeColor=#586b78;strokeWidth=4.0;endArrow=block;endFill=1;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.583;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="64" target="85">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="428.68" y="990" as="sourcePoint"/>
+                        <mxPoint x="533.6800000000001" y="990" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="310" y="940"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

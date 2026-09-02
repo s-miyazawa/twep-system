@@ -537,6 +537,17 @@ security profiles. `check-sgx-test-hook-boundary` verifies that the private EDL
 does not enter the production build. The Wasm files under
 `build/sgx-backend-test-fixtures/` are non-distributable SGX backend
 negative-test fixtures and are not normal build artifacts.
+Hardware validation uses the SGX AttesTAM targets with a compatible `linux-sgx`
+WAMR tree, Intel SGX device access, AESM, PCCS/QVL, and fresh disposable
+AttesTAM service state. These tests observe only the public registration and
+`/tam` APIs; they do not inspect an AttesTAM checkout or SQLite database.
+Replay is validated by resubmitting the exact captured Evidence and accepting
+an HTTP 4xx/5xx rejection after a successful exchange. Database schema,
+challenge-consumption transactions, and replay-time DB immutability belong to
+AttesTAM's own tests. Run hardware smokes outside sandboxes that hide SGX
+device nodes. See
+[sgx/Backend.md](sgx/Backend.md) and [sgx/README.md](sgx/README.md).
+
 The following remains the lightweight, architecture-independent CI gate.
 
 ```sh

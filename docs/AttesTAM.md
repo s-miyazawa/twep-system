@@ -19,6 +19,14 @@ untrusted network.
 
 ## Integration model
 
+Linux and both OP-TEE profiles use the Generic EAT/Veraison integration
+described below. SGX HW instead sends the canonical DCAP Quote3 bundle for
+Intel QVL appraisal; it does not require the Generic EAT CoRIM. The SGX
+challenge/key binding and protected publication flow are described in
+[sgx/Backend.md](sgx/Backend.md), and its short live procedure is in
+[sgx/README.md](sgx/README.md). Both profiles use fixed development
+credentials and remain `final-verified=false`.
+
 - `twepd` owns IPC, HTTP transport, and state-file transport on the Linux side.
 - The Rust TEEP Agent owns TEEP, COSE, SUIT, Catalog validation, and promotion
   decisions.

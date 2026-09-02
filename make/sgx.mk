@@ -20,6 +20,9 @@ SGX_BACKEND_TEST_FIXTURES := $(SGX_BACKEND_TEST_FIXTURE_DIR)/env-import.wasm \
 .PHONY: build-sgx-backend-tests test-sgx-backend build-sgx-backend-test-hooks
 .PHONY: test-sgx-backend-hooks build-sgx-heap-diagnostics
 .PHONY: check-sgx-test-hook-boundary build-sgx-hw clean-sgx
+.PHONY: smoke-sgx-hw-dcap-evidence smoke-sgx-hw-attestam-auth
+.PHONY: smoke-sgx-hw-attestam-catalog smoke-sgx-hw-attestam-app
+.PHONY: smoke-sgx-hw-attestam-apps-restart smoke-sgx-hw-attestam-cli-apps-restart
 
 build-sgx-backend-tests: build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm build/negaposi.wasm build/catalog.dev.cbor $(SGX_BACKEND_TEST_FIXTURES)
 	$(CMAKE) -S lib/twep-wr -B $(SGX_BACKEND_TEST_BUILD_DIR) \
@@ -106,6 +109,39 @@ build-sgx-hw: build/teep-agent.wasm build/helloworld.wasm build/calcadd.wasm bui
 		-DTWEP_WR_SGX_HW_DEBUG=$(SGX_HW_DEBUG) \
 		-DTWEP_WR_SGX_SIGNED_ENCLAVE=$(SGX_HW_SIGNED_ENCLAVE)
 	$(CMAKE) --build $(SGX_HW_TWEP_WR_BUILD_DIR)
+
+smoke-sgx-hw-dcap-evidence: build-sgx-hw
+	@test -e /dev/sgx_enclave -a -e /dev/sgx_provision
+	TMPDIR="$(TMPDIR)" SGX_HW_BUILD_DIR="$(SGX_HW_TWEP_WR_BUILD_DIR)" ATTESTAM_URL="$(ATTESTAM_URL)" ./scripts/run_sgx_hw_smoke.sh evidence
+
+smoke-sgx-hw-attestam-auth: build-sgx-hw
+	@test -e /dev/sgx_enclave -a -e /dev/sgx_provision
+	TMPDIR="$(TMPDIR)" SGX_HW_BUILD_DIR="$(SGX_HW_TWEP_WR_BUILD_DIR)" ATTESTAM_URL="$(ATTESTAM_URL)" ./scripts/run_sgx_hw_smoke.sh auth
+
+smoke-sgx-hw-attestam-catalog: build-sgx-hw
+	@test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make smoke-sgx-hw-attestam-catalog ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest"; exit 2; }
+	@test -e /dev/sgx_enclave -a -e /dev/sgx_provision
+	$(GO) run ./cmd/twep-attestam-fixture-gen --catalog --out build/attestam/catalog-default.envelope.cbor --sequence 1 --register-url "$(ATTESTAM_REGISTER_URL)"
+	TMPDIR="$(TMPDIR)" SGX_HW_BUILD_DIR="$(SGX_HW_TWEP_WR_BUILD_DIR)" ATTESTAM_URL="$(ATTESTAM_URL)" ./scripts/run_sgx_hw_smoke.sh catalog
+
+smoke-sgx-hw-attestam-app: build-sgx-hw
+	@test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make smoke-sgx-hw-attestam-app ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest"; exit 2; }
+	@test -e /dev/sgx_enclave -a -e /dev/sgx_provision
+	$(GO) run ./cmd/twep-attestam-fixture-gen --catalog --catalog-payload build/catalog.dev.cbor --out build/attestam/catalog-apps.envelope.cbor --sequence 1 --register-url "$(ATTESTAM_REGISTER_URL)"
+	$(GO) run ./cmd/twep-attestam-fixture-gen --command helloworld --wasm build/helloworld.wasm --wasm-file helloworld.wasm --out build/attestam/helloworld.envelope.cbor --sequence 1 --register-url "$(ATTESTAM_REGISTER_URL)"
+	TMPDIR="$(TMPDIR)" SGX_HW_BUILD_DIR="$(SGX_HW_TWEP_WR_BUILD_DIR)" ATTESTAM_URL="$(ATTESTAM_URL)" ./scripts/run_sgx_hw_smoke.sh app
+
+smoke-sgx-hw-attestam-apps-restart: build-sgx-hw
+	@test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make smoke-sgx-hw-attestam-apps-restart ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest"; exit 2; }
+	@test -e /dev/sgx_enclave -a -e /dev/sgx_provision
+	./scripts/register_attestam_demo_apps.sh "$(ATTESTAM_REGISTER_URL)"
+	TMPDIR="$(TMPDIR)" SGX_HW_BUILD_DIR="$(SGX_HW_TWEP_WR_BUILD_DIR)" ATTESTAM_URL="$(ATTESTAM_URL)" ./scripts/run_sgx_hw_smoke.sh apps-restart
+
+smoke-sgx-hw-attestam-cli-apps-restart: build bin/twep-cli build-sgx-hw
+	@test -n "$(ATTESTAM_REGISTER_URL)" || { echo "usage: make smoke-sgx-hw-attestam-cli-apps-restart ATTESTAM_REGISTER_URL=http://127.0.0.1:8080/SUITManifestService/RegisterManifest"; exit 2; }
+	@test -e /dev/sgx_enclave -a -e /dev/sgx_provision
+	./scripts/register_attestam_demo_apps.sh "$(ATTESTAM_REGISTER_URL)"
+	TMPDIR="$(TMPDIR)" SGX_HW_BUILD_DIR="$(SGX_HW_TWEP_WR_BUILD_DIR)" ATTESTAM_URL="$(ATTESTAM_URL)" ./scripts/run_sgx_hw_cli_apps_restart.sh
 
 clean-sgx:
 	rm -rf $(SGX_BACKEND_TEST_BUILD_DIR) $(SGX_BACKEND_HOOKS_BUILD_DIR) \

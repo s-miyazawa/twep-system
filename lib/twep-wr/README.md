@@ -33,9 +33,9 @@ SGX hardware and private backend-test builds place WAMR only in the Enclave. The
 library supplies lifecycle and allowlisted byte transport; the Enclave owns
 TEEP Agent privilege, protected state, Catalog/app authorization, and app
 execution. This is private implementation behind unchanged public C ABI v3.
-See [the ABI](../../docs/ABI.md) for contracts and limits,
-[the security model](../../docs/Security.md) for trust boundaries, and
-[the test plan](../../docs/Testing.md) for backend-test commands.
+See [the SGX backend profile](../../docs/sgx/Backend.md) for the authoritative design,
+[the ABI](../../docs/ABI.md) for contracts and limits, and
+[the test plan](../../docs/Testing.md) for build and smoke commands.
 
 ## Source Layout
 
@@ -55,8 +55,8 @@ See [the ABI](../../docs/ABI.md) for contracts and limits,
   direct OP-TEE and SGX execution helpers. `runtime.c` selects exactly one
   backend at compile time; only SGX retains opaque Enclave lifecycle state.
 
-The SGX trusted/untrusted boundary is fixed by the production and private test
-EDL files under `src/platform/sgx/enclave/`.
+The SGX trusted/untrusted source map is maintained in
+[the SGX backend profile](../../docs/sgx/Backend.md#implementation-map).
 
 OP-TEE is selected explicitly as `arm-optee` or `riscv-optee`. Both choices
 compile `src/platform/optee-common/` plus one minimal descriptor from
