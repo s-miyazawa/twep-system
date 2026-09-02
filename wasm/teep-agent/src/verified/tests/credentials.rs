@@ -6,11 +6,9 @@ use super::*;
 #[test]
 fn selected_protected_tam_key_does_not_fallback_to_demo_key() {
     let payload = b"\x82\x03\xa0";
-    let signed = crate::cose::sign_demo_agent_esp256_cose_sign1(
-        payload,
-        crate::cose::DemoAgentSigner::Alternate,
-    )
-    .expect("signed TAM response");
+    let signed =
+        crate::cose::sign_agent_esp256_cose_sign1(payload, crate::cose::DemoAgentSigner::Alternate)
+            .expect("signed TAM response");
     let wrong_key = credential_management::AttestamMessageVerificationKey {
         x: [8u8; 32],
         y: [8u8; 32],

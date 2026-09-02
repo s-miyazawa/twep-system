@@ -3,19 +3,14 @@
 
 use super::*;
 
+const MAX_ATTESTAM_REQUEST_BYTES: usize = 32 * 1024;
 const DEV_AGENT_PUBLIC_KEY_PATH: &[u8] = b"teep-agent/dev-agent-public-key.cbor";
-const DEMO_AGENT_PUBLIC_COSE_KEY: &[u8] = &[
-    0xa5, 0x01, 0x02, 0x03, 0x28, 0x20, 0x01, 0x21, 0x58, 0x20, 0xbe, 0x7c, 0x56, 0x99, 0x3f, 0x71,
-    0x11, 0x45, 0x34, 0xc2, 0xf4, 0xa4, 0xf4, 0xe4, 0x60, 0x67, 0x84, 0xfa, 0x9d, 0x96, 0x35, 0xe1,
-    0x22, 0xbc, 0x8a, 0x49, 0x0b, 0x2e, 0x11, 0xfe, 0xb9, 0x32, 0x22, 0x58, 0x20, 0x81, 0x69, 0x6b,
-    0x42, 0xc3, 0xbe, 0x1b, 0x24, 0x4c, 0xc0, 0x3b, 0xca, 0x97, 0xf0, 0xce, 0x75, 0xe2, 0xd9, 0x3a,
-    0xda, 0x1c, 0xe5, 0x56, 0x62, 0x92, 0x27, 0xf1, 0x0a, 0x8c, 0x2c, 0x5b, 0x29,
-];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BuildQueryResponseError {
-    MissingToken,
+    AttestationUnsupported,
     EncodeFailed,
+    PendingHostIo,
 }
 
 pub(super) struct SignedQueryResponse {
@@ -32,16 +27,21 @@ pub(super) fn sign_query_response(
     out_desc_ptr: u32,
     query_request_payload: &[u8],
     requested_component_id: &[u8],
+    signer: DemoAgentSigner,
 ) -> Result<SignedQueryResponse, i32> {
-    let mut agent_public_key_buf = [0u8; 256];
-    let mut evidence_buf = [0u8; 1024];
+    let agent_public_key = demo_agent_public_cose_key(signer).map_err(|_| {
+        write_output(
+            out_desc_ptr,
+            &error_output(b"teep.protocol", b"agent key unavailable"),
+        )
+    })?;
     let query_response = match build_query_response_payload(
         query_request_payload,
         requested_component_id,
-        &mut agent_public_key_buf,
-        &mut evidence_buf,
+        &agent_public_key,
     ) {
         Ok(value) => value,
+        Err(BuildQueryResponseError::PendingHostIo) => return Err(127),
         Err(err) => {
             return Err(write_output(
                 out_desc_ptr,
@@ -49,11 +49,18 @@ pub(super) fn sign_query_response(
             ))
         }
     };
-    match sign_demo_agent_esp256_cose_sign1(&query_response.payload, demo_agent_signer()) {
-        Ok(signed) => Ok(SignedQueryResponse {
+    match sign_agent_esp256_cose_sign1(&query_response.payload, signer) {
+        Ok(signed) if query_response_size_allowed(signed.len()) => Ok(SignedQueryResponse {
             cose: signed,
             evidence_bearing: query_response.evidence_bearing,
         }),
+        Ok(_) => Err(write_output(
+            out_desc_ptr,
+            &error_output(
+                b"teep.resource_limit",
+                b"AttesTAM QueryResponse exceeds 32 KiB",
+            ),
+        )),
         Err(_) => Err(write_output(
             out_desc_ptr,
             &error_output(b"teep.protocol", b"AttesTAM QueryResponse signing failed"),
@@ -61,59 +68,154 @@ pub(super) fn sign_query_response(
     }
 }
 
+fn query_response_size_allowed(len: usize) -> bool {
+    len <= MAX_ATTESTAM_REQUEST_BYTES
+}
+
 fn build_query_response_payload(
     query_request_payload: &[u8],
     requested_component_id: &[u8],
-    agent_public_key_buf: &mut [u8],
-    evidence_buf: &mut [u8],
+    agent_public_key: &[u8],
 ) -> Result<QueryResponsePayload, BuildQueryResponseError> {
-    match query_response_payload(query_request_payload, requested_component_id) {
-        Ok(value) => Ok(QueryResponsePayload {
-            payload: value,
-            evidence_bearing: false,
-        }),
-        Err(QueryResponsePayloadError::AttestationUnsupported) => {
-            let challenge = evidence::query_request_challenge(query_request_payload)
-                .ok_or(BuildQueryResponseError::EncodeFailed)?;
-            let agent_public_key = demo_agent_public_key(agent_public_key_buf);
-            let evidence = evidence::create_eat_evidence(challenge, agent_public_key, evidence_buf)
+    let challenge = evidence::query_request_challenge_result(query_request_payload)
+        .map_err(|_| BuildQueryResponseError::EncodeFailed)?;
+    let attestation = if let Some(challenge) = challenge {
+        let format = platform_attestation_payload_format()?;
+        let evidence = if format == evidence::GENERIC_EAT_FORMAT {
+            let mut output = [0u8; 1024];
+            let payload = evidence::create_eat_evidence(challenge, agent_public_key, &mut output)
                 .map_err(|_| BuildQueryResponseError::EncodeFailed)?;
-            let payload = query_response_payload_with_attestation(requested_component_id, evidence)
-                .map_err(|_| BuildQueryResponseError::EncodeFailed)?;
-            Ok(QueryResponsePayload {
-                payload,
-                evidence_bearing: true,
-            })
-        }
-        Err(QueryResponsePayloadError::MissingToken) => Err(BuildQueryResponseError::MissingToken),
-        Err(QueryResponsePayloadError::EncodeFailed) => Err(BuildQueryResponseError::EncodeFailed),
+            evidence::AttestationEvidence {
+                format,
+                payload: payload.to_vec(),
+            }
+        } else {
+            evidence::create_platform_evidence(
+                challenge,
+                agent_public_key,
+                |challenge, agent_public_key, out| match host_io::create_evidence(
+                    challenge,
+                    agent_public_key,
+                    out,
+                ) {
+                    Ok(len) => Ok(len),
+                    Err((11, _)) => Err(evidence::EvidenceError::Internal),
+                    Err((status, len)) => Err(evidence::host_status_to_evidence_error(status, len)),
+                },
+                format,
+            )
+            .map_err(|err| match err {
+                evidence::EvidenceError::Internal => BuildQueryResponseError::PendingHostIo,
+                evidence::EvidenceError::Unsupported => {
+                    BuildQueryResponseError::AttestationUnsupported
+                }
+                _ => BuildQueryResponseError::EncodeFailed,
+            })?
+        };
+        Some(evidence)
+    } else {
+        None
+    };
+    let payload = query_response_payload(
+        query_request_payload,
+        requested_component_id,
+        attestation.as_ref(),
+    )
+    .map_err(|_| BuildQueryResponseError::EncodeFailed)?;
+    Ok(QueryResponsePayload {
+        payload,
+        evidence_bearing: attestation.is_some(),
+    })
+}
+
+fn platform_attestation_payload_format() -> Result<Vec<u8>, BuildQueryResponseError> {
+    let required = match host_io::attestation_payload_format(&mut []) {
+        Err((2, required)) => required,
+        Ok(required) => required,
+        _ => return Err(BuildQueryResponseError::AttestationUnsupported),
+    };
+    if required == 0 || required > evidence::MAX_FORMAT_BYTES {
+        return Err(BuildQueryResponseError::EncodeFailed);
+    }
+    let mut format = alloc::vec![0; required];
+    match host_io::attestation_payload_format(&mut format) {
+        Ok(written) if written == required => Ok(format),
+        _ => Err(BuildQueryResponseError::EncodeFailed),
     }
 }
 
 fn build_query_response_error_output(err: BuildQueryResponseError) -> Vec<u8> {
     match err {
-        BuildQueryResponseError::MissingToken => error_output(
-            b"teep.protocol",
-            b"AttesTAM QueryRequest token is not available",
+        BuildQueryResponseError::AttestationUnsupported => error_output(
+            b"teep.attestation_unsupported",
+            b"AttesTAM QueryRequest attestation challenge is not supported",
         ),
         BuildQueryResponseError::EncodeFailed => error_output(
             b"teep.protocol",
             b"AttesTAM QueryResponse payload encoding failed",
         ),
-    }
-}
-
-fn demo_agent_public_key(buf: &mut [u8]) -> &[u8] {
-    match host_io::read_file(DEV_AGENT_PUBLIC_KEY_PATH, buf) {
-        Ok(len) => &buf[..len],
-        Err(_) => DEMO_AGENT_PUBLIC_COSE_KEY,
+        BuildQueryResponseError::PendingHostIo => {
+            error_output(b"teep.protocol", b"AttesTAM QueryResponse host I/O pending")
+        }
     }
 }
 
 pub(super) fn demo_agent_signer() -> DemoAgentSigner {
-    let mut buf = [0u8; 256];
-    match host_io::read_file(DEV_AGENT_PUBLIC_KEY_PATH, &mut buf) {
-        Ok(_) => DemoAgentSigner::Alternate,
-        Err(_) => DemoAgentSigner::Default,
+    let alternate = demo_agent_public_cose_key(DemoAgentSigner::Alternate).ok();
+    let mut buf = [0u8; 128];
+    match (
+        host_io::read_file(DEV_AGENT_PUBLIC_KEY_PATH, &mut buf),
+        alternate,
+    ) {
+        (Ok(len), Some(expected)) => demo_agent_signer_for_selector(&buf[..len], &expected),
+        _ => DemoAgentSigner::Default,
+    }
+}
+
+fn demo_agent_signer_for_selector(selector: &[u8], alternate: &[u8]) -> DemoAgentSigner {
+    if selector == alternate {
+        DemoAgentSigner::Alternate
+    } else {
+        DemoAgentSigner::Default
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn final_query_response_enforces_attestam_request_limit() {
+        assert!(query_response_size_allowed(MAX_ATTESTAM_REQUEST_BYTES));
+        assert!(!query_response_size_allowed(MAX_ATTESTAM_REQUEST_BYTES + 1));
+    }
+
+    #[test]
+    fn alternate_selector_requires_an_exact_known_public_key() {
+        let alternate = demo_agent_public_cose_key(DemoAgentSigner::Alternate).unwrap();
+        assert_eq!(
+            demo_agent_signer_for_selector(&alternate, &alternate),
+            DemoAgentSigner::Alternate
+        );
+        let mut changed = alternate.clone();
+        changed[10] ^= 1;
+        assert_eq!(
+            demo_agent_signer_for_selector(&changed, &alternate),
+            DemoAgentSigner::Default
+        );
+        let mut extended = alternate.clone();
+        extended.push(0);
+        assert_eq!(
+            demo_agent_signer_for_selector(&extended, &alternate),
+            DemoAgentSigner::Default
+        );
+        assert_eq!(
+            demo_agent_signer_for_selector(&alternate[..alternate.len() - 1], &alternate),
+            DemoAgentSigner::Default
+        );
+        assert_eq!(
+            demo_agent_signer_for_selector(&[], &alternate),
+            DemoAgentSigner::Default
+        );
     }
 }

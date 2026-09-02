@@ -19,6 +19,8 @@ static int32_t twep_host_http_post(wasm_exec_env_t exec_env, const char *url, ui
 static int32_t twep_host_create_evidence(wasm_exec_env_t exec_env, const uint8_t *challenge, uint32_t challenge_len,
                                          const uint8_t *agent_public_key_cose, uint32_t agent_public_key_cose_len,
                                          uint8_t *buf, uint32_t buf_cap, uint32_t *out_len);
+static int32_t twep_host_attestation_payload_format(wasm_exec_env_t exec_env, uint8_t *buf,
+                                                     uint32_t buf_cap, uint32_t *out_len);
 static int32_t twep_host_platform_status(wasm_exec_env_t exec_env, uint8_t *buf, uint32_t buf_cap,
                                          uint32_t *out_len);
 static int32_t twep_host_teep_agent_measurement_sha256(wasm_exec_env_t exec_env, uint8_t *buf, uint32_t buf_cap,
@@ -44,6 +46,7 @@ static NativeSymbol teep_agent_native_symbols[] = {
     { "twep_host_read_protected", twep_host_read_protected, "(*~*~*)i", NULL },
     { "twep_host_http_post", twep_host_http_post, "(*~*~*~*)i", NULL },
     { "twep_host_create_evidence", twep_host_create_evidence, "(*~*~*~*)i", NULL },
+    { "twep_host_attestation_payload_format", twep_host_attestation_payload_format, "(*~*)i", NULL },
     { "twep_host_platform_status", twep_host_platform_status, "(*~*)i", NULL },
     { "twep_host_teep_agent_measurement_sha256", twep_host_teep_agent_measurement_sha256, "(*~*)i", NULL },
     { "twep_host_acceptance_generation", twep_host_acceptance_generation, "(*)i", NULL },
@@ -60,6 +63,17 @@ twep_wr_status_t twep_wr_register_teep_agent_hostcalls(void)
         return TWEP_WR_ERR_INIT;
     }
     return TWEP_WR_OK;
+}
+
+static int32_t platform_status_to_host_status(twep_wr_platform_status_t status)
+{
+    switch (status) {
+    case TWEP_WR_PLATFORM_OK: return 0;
+    case TWEP_WR_PLATFORM_ERR_NO_MEMORY: return 2;
+    case TWEP_WR_PLATFORM_ERR_UNSUPPORTED: return 8;
+    case TWEP_WR_PLATFORM_ERR_IO: return 7;
+    }
+    return 7;
 }
 
 const twep_wr_context_t *twep_wr_teep_agent_context_from_exec_env(wasm_exec_env_t exec_env)
@@ -209,6 +223,25 @@ static int32_t twep_host_create_evidence(wasm_exec_env_t exec_env, const uint8_t
                                                   buf, buf_cap, &evidence_len);
     *out_len = evidence_len > UINT32_MAX ? UINT32_MAX : (uint32_t)evidence_len;
     return status;
+}
+
+static int32_t twep_host_attestation_payload_format(wasm_exec_env_t exec_env, uint8_t *buf,
+                                                     uint32_t buf_cap, uint32_t *out_len)
+{
+    static const char format[] =
+        "application/eat+cwt; eat_profile=\"urn:ietf:rfc:rfc9711\"";
+    const size_t format_len = sizeof(format) - 1;
+    if (twep_wr_teep_agent_context_from_exec_env(exec_env) == NULL || out_len == NULL) {
+        return 1;
+    }
+    *out_len = (uint32_t)format_len;
+    if (buf_cap < format_len) {
+        return 2;
+    }
+    if (format_len != 0 && buf != NULL) {
+        memcpy(buf, format, format_len);
+    }
+    return 0;
 }
 
 static int32_t twep_host_platform_status(wasm_exec_env_t exec_env, uint8_t *buf, uint32_t buf_cap,

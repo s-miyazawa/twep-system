@@ -5,6 +5,7 @@ GO ?= go
 CC ?= cc
 .DELETE_ON_ERROR:
 WAMR_DIR ?= $(HOME)/opt/wasm-micro-runtime
+TMPDIR ?= /tmp
 CMAKE ?= cmake
 OPTEE_ROOT ?= $(HOME)/opt/optee
 export OPTEE_ROOT
@@ -27,6 +28,8 @@ RISCV_OPTEE_ROOT ?= $(abspath ../riscv-optee)
 RISCV_OPTEE_BUILDROOT ?= $(RISCV_OPTEE_ROOT)/buildroot
 RISCV_OPTEE_WAMR_DIR ?= $(RISCV_OPTEE_ROOT)/workspace/wasm-micro-runtime
 RISCV_OPTEE_OUT ?= build/riscv-optee-v9
+ATTESTAM_URL ?= http://127.0.0.1:8080/tam
+ATTESTAM_ROOT ?=
 WASM_SIGNER_DEPS := cmd/twep-wasm-sign/main.go internal/wasmsign/wasmsign.go internal/demokeys/keys.go
 TEEP_AGENT_TEST_DEPS := $(wildcard wasm/teep-agent/src/verified/tests/*.rs)
 RISCV_OPTEE_OFFLINE_NORMAL_MODES := \
@@ -57,7 +60,7 @@ ARM_OPTEE_OFFLINE_TARGETS := \
 	smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative \
 	smoke-optee-trustzone-wamr-spike-negatives
 
-.PHONY: fmt build setup-optee-arm-v8 check-optee-arm-v8-env build-optee-trustzone build-optee-riscv-v9 package-optee-riscv-v9 smoke-optee-riscv-v9 smoke-optee-riscv-v9-attestam-live smoke-optee-riscv-v9-attestam-verified-acceptance smoke-optee-riscv-v9-attestam-verified-catalog smoke-optee-riscv-v9-attestam-verified-app test check-optee-trustzone-smokes e2e e2e-attestam-insecure e2e-attestam-live attestam-remotehello-fixture register-attestam-remotehello-fixture attestam-helloworld-fixture register-attestam-helloworld-fixture attestam-catalog-fixture attestam-catalog-test-fixtures register-attestam-catalog-fixture register-attestam-app-catalog-fixture veraison-generic-eat-corim provision-veraison-generic-eat-fixture smoke-attestam-insecure smoke-attestam-challenge-observe m10-trustzone-checkpoint smoke-optee-trustzone smoke-optee-trustzone-failures smoke-optee-trustzone-abi-vectors smoke-optee-trustzone-execute-abi-negative smoke-optee-trustzone-execute-helloworld smoke-optee-trustzone-execute-timeout-negative smoke-optee-trustzone-execute-calcadd smoke-optee-trustzone-execute-negaposi smoke-optee-trustzone-execute-hostcall-negative smoke-optee-trustzone-execute-cleanup-negative smoke-optee-trustzone-execute-catalog-resource-negative smoke-optee-trustzone-teep-agent-resolve smoke-optee-trustzone-teep-agent-signature-negative smoke-optee-trustzone-teep-agent-resolve-hash-negative smoke-optee-trustzone-teep-agent-resolve-catalog-negative smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative smoke-optee-trustzone-public-abi-wrapped-error-negative smoke-optee-trustzone-public-abi-app-hash-negative smoke-optee-trustzone-public-abi-resource-limit-negative smoke-optee-trustzone-public-abi-execute-helloworld smoke-optee-trustzone-public-abi-execute-calcadd smoke-optee-trustzone-public-abi-execute-negaposi smoke-optee-trustzone-attestam-live smoke-optee-trustzone-attestam-verified-acceptance smoke-optee-trustzone-attestam-verified-catalog smoke-optee-trustzone-attestam-verified-app smoke-optee-trustzone-host-io-resume smoke-optee-trustzone-host-io-resume-negative smoke-optee-trustzone-sha256-boundary-negative smoke-optee-trustzone-teep-agent-hostcall-http smoke-optee-trustzone-teep-agent-hostcall-evidence smoke-optee-trustzone-teep-agent-hostcall-bridge smoke-optee-trustzone-teep-agent-hostcall-object-negative smoke-optee-trustzone-wamr-spike smoke-optee-trustzone-wamr-spike-linked smoke-optee-trustzone-wamr-spike-linked-negative smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative smoke-optee-trustzone-wamr-spike-negatives clean
+.PHONY: fmt build setup-optee-arm-v8 check-optee-arm-v8-env build-optee-trustzone build-optee-riscv-v9 package-optee-riscv-v9 smoke-optee-riscv-v9 smoke-optee-riscv-v9-attestam-live smoke-optee-riscv-v9-attestam-verified-acceptance smoke-optee-riscv-v9-attestam-verified-catalog smoke-optee-riscv-v9-attestam-verified-app test check-optee-trustzone-smokes e2e e2e-attestam-insecure e2e-attestam-live e2e-attestam-v26-generic-eat attestam-v26-conformance attestam-remotehello-fixture register-attestam-remotehello-fixture attestam-helloworld-fixture register-attestam-helloworld-fixture attestam-catalog-fixture attestam-catalog-test-fixtures register-attestam-catalog-fixture register-attestam-app-catalog-fixture veraison-generic-eat-corim provision-veraison-generic-eat-fixture smoke-attestam-insecure smoke-attestam-challenge-observe m10-trustzone-checkpoint smoke-optee-trustzone smoke-optee-trustzone-failures smoke-optee-trustzone-abi-vectors smoke-optee-trustzone-execute-abi-negative smoke-optee-trustzone-execute-helloworld smoke-optee-trustzone-execute-timeout-negative smoke-optee-trustzone-execute-calcadd smoke-optee-trustzone-execute-negaposi smoke-optee-trustzone-execute-hostcall-negative smoke-optee-trustzone-execute-cleanup-negative smoke-optee-trustzone-execute-catalog-resource-negative smoke-optee-trustzone-teep-agent-resolve smoke-optee-trustzone-teep-agent-signature-negative smoke-optee-trustzone-teep-agent-resolve-hash-negative smoke-optee-trustzone-teep-agent-resolve-catalog-negative smoke-optee-trustzone-teep-agent-resolve-wrapped-error-negative smoke-optee-trustzone-public-abi-wrapped-error-negative smoke-optee-trustzone-public-abi-app-hash-negative smoke-optee-trustzone-public-abi-resource-limit-negative smoke-optee-trustzone-public-abi-execute-helloworld smoke-optee-trustzone-public-abi-execute-calcadd smoke-optee-trustzone-public-abi-execute-negaposi smoke-optee-trustzone-attestam-live smoke-optee-trustzone-attestam-verified-acceptance smoke-optee-trustzone-attestam-verified-catalog smoke-optee-trustzone-attestam-verified-app smoke-optee-trustzone-host-io-resume smoke-optee-trustzone-host-io-resume-negative smoke-optee-trustzone-sha256-boundary-negative smoke-optee-trustzone-teep-agent-hostcall-http smoke-optee-trustzone-teep-agent-hostcall-evidence smoke-optee-trustzone-teep-agent-hostcall-bridge smoke-optee-trustzone-teep-agent-hostcall-object-negative smoke-optee-trustzone-wamr-spike smoke-optee-trustzone-wamr-spike-linked smoke-optee-trustzone-wamr-spike-linked-negative smoke-optee-trustzone-wamr-spike-input-negative smoke-optee-trustzone-wamr-spike-output-negative smoke-optee-trustzone-wamr-spike-cleanup-negative smoke-optee-trustzone-wamr-spike-negatives clean
 .PHONY: smoke-optee-trustzone-teep-agent-acceptance
 .PHONY: smoke-optee-trustzone-teep-agent-acceptance-faults
 .PHONY: smoke-optee-trustzone-teep-agent-transcript-limits
@@ -190,7 +193,7 @@ build/helloworld.wasm: wasm/apps/helloworld/Cargo.toml wasm/apps/helloworld/src/
 	$(GO) run ./cmd/twep-wasm-sign -role app -in $@ -out $@
 
 build/teep-agent.wasm: wasm/teep-agent/Cargo.toml wasm/teep-agent/src/lib.rs wasm/teep-agent/src/catalog_validator.rs wasm/teep-agent/src/cbor.rs wasm/teep-agent/src/cose.rs wasm/teep-agent/src/credential_management.rs wasm/teep-agent/src/evidence.rs wasm/teep-agent/src/freshness.rs wasm/teep-agent/src/host_io.rs wasm/teep-agent/src/probes.rs wasm/teep-agent/src/protected_credentials.rs wasm/teep-agent/src/session.rs wasm/teep-agent/src/session/exchange.rs wasm/teep-agent/src/session/insecure_install.rs wasm/teep-agent/src/session/live.rs wasm/teep-agent/src/session/observation.rs wasm/teep-agent/src/suit.rs wasm/teep-agent/src/teep.rs wasm/teep-agent/src/verified.rs wasm/teep-agent/src/verified/agent_identity.rs wasm/teep-agent/src/verified/credentials.rs wasm/teep-agent/src/verified/diagnostics.rs wasm/teep-agent/src/verified/dry_run.rs wasm/teep-agent/src/verified/evidence_status.rs wasm/teep-agent/src/verified/live_acceptance.rs wasm/teep-agent/src/verified/state.rs $(TEEP_AGENT_TEST_DEPS) wasm/teep-agent/src/wasm_signature.rs $(WASM_SIGNER_DEPS)
-	$(CARGO) build --manifest-path wasm/teep-agent/Cargo.toml --release --target wasm32-unknown-unknown
+	TMPDIR="$(TMPDIR)" $(CARGO) build --manifest-path wasm/teep-agent/Cargo.toml --release --target wasm32-unknown-unknown
 	cp wasm/teep-agent/target/wasm32-unknown-unknown/release/twep_teep_agent.wasm $@
 	$(GO) run ./cmd/twep-wasm-sign -role teep-agent -in $@ -out $@
 
@@ -294,6 +297,11 @@ e2e-attestam-insecure: build
 
 e2e-attestam-live: build
 	TWEP_E2E_BIN_DIR=$(CURDIR)/bin TWEP_E2E_REPO_ROOT=$(CURDIR) $(GO) test ./tests/e2e -run TestAttestamLiveChallengeResponseUpdate -count=1 -v
+
+e2e-attestam-v26-generic-eat:
+	ATTESTAM_ROOT="$(ATTESTAM_ROOT)" WAMR_DIR="$(WAMR_DIR)" VERAISON_PROVISION_URL="$(VERAISON_PROVISION_URL)" VERAISON_CHALLENGE_URL="$(VERAISON_CHALLENGE_URL)" ATTESTAM_CONFORMANCE_ADDR="$(ATTESTAM_CONFORMANCE_ADDR)" ./scripts/compat/run-attestam-v26-generic-eat.sh
+
+attestam-v26-conformance: e2e-attestam-v26-generic-eat
 
 smoke-attestam-insecure:
 	@set -eu; \

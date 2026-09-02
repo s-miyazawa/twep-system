@@ -9,6 +9,7 @@ pub(super) fn process_update_payload(
     attestam_url: &[u8],
     requested_component_id: &[u8],
     body_payload: &[u8],
+    signer: DemoAgentSigner,
 ) -> Result<bool, i32> {
     observation::observe_manifest_summary(body_payload)?;
     let candidate = match teep_update_candidate(body_payload, requested_component_id) {
@@ -36,7 +37,7 @@ pub(super) fn process_update_payload(
     observation::write_update_candidate_checked(&candidate)?;
     verify_app_payload_signature_or_error(out_desc_ptr, &candidate)?;
     stage_update_or_127(&candidate)?;
-    post_success(out_desc_ptr, attestam_url, &candidate)
+    post_success(out_desc_ptr, attestam_url, &candidate, signer)
 }
 
 fn verify_app_payload_signature_or_error(
@@ -82,6 +83,7 @@ fn post_success(
     out_desc_ptr: u32,
     attestam_url: &[u8],
     candidate: &TeepUpdateCandidate<'_>,
+    signer: DemoAgentSigner,
 ) -> Result<bool, i32> {
     let manifest_info = candidate.info;
     let Some(success_payload) = success_response_payload(&manifest_info, candidate.update_token)
@@ -97,16 +99,15 @@ fn post_success(
             &error_output(b"teep.protocol", b"AttesTAM SUIT sequence is not fresh"),
         ));
     }
-    let success_cose =
-        match sign_demo_agent_esp256_cose_sign1(&success_payload, demo_agent_signer()) {
-            Ok(signed) => signed,
-            Err(_) => {
-                return Err(write_output(
-                    out_desc_ptr,
-                    &error_output(b"teep.protocol", b"AttesTAM Success signing failed"),
-                ));
-            }
-        };
+    let success_cose = match sign_agent_esp256_cose_sign1(&success_payload, signer) {
+        Ok(signed) => signed,
+        Err(_) => {
+            return Err(write_output(
+                out_desc_ptr,
+                &error_output(b"teep.protocol", b"AttesTAM Success signing failed"),
+            ));
+        }
+    };
     if !host_io::write_file(LAST_TEEP_SUCCESS_COSE_PATH, &success_cose) {
         return Err(127);
     }

@@ -599,6 +599,25 @@ static int32_t teep_host_create_evidence(wasm_exec_env_t exec_env,
 	return 11;
 }
 
+static int32_t teep_host_attestation_payload_format(wasm_exec_env_t exec_env,
+						     uint8_t *buf,
+						     uint32_t buf_cap,
+						     uint32_t *out_len)
+{
+	static const char format[] =
+		"application/eat+cwt; eat_profile=\"urn:ietf:rfc:rfc9711\"";
+	size_t len = sizeof(format) - 1;
+
+	if (!teep_hostcall_context(exec_env) || !out_len)
+		return 1;
+	*out_len = (uint32_t)len;
+	if (len > buf_cap)
+		return 2;
+	if (len && buf)
+		TEE_MemMove(buf, format, len);
+	return 0;
+}
+
 TEE_Result teep_agent_pending_to_need_host_io(
 	const struct teep_agent_hostcall_context *ctx, uint8_t *out,
 	size_t out_size, size_t *out_len)
@@ -1034,7 +1053,7 @@ static uint64_t teep_host_unix_time_ms(wasm_exec_env_t exec_env)
 	return ((uint64_t)time.seconds * 1000) + time.millis;
 }
 
-NativeSymbol teep_agent_native_symbols[14] = {
+NativeSymbol teep_agent_native_symbols[15] = {
 	{"twep_host_log", teep_host_log, "(i*~)", NULL},
 	{"twep_host_read_file", teep_host_read_file, "(*~*~*)i", NULL},
 	{"twep_host_write_file", teep_host_write_file, "(*~*~)i", NULL},
@@ -1043,6 +1062,8 @@ NativeSymbol teep_agent_native_symbols[14] = {
 	{"twep_host_http_post", teep_host_http_post, "(*~*~*~*)i", NULL},
 	{"twep_host_create_evidence", teep_host_create_evidence, "(*~*~*~*)i",
 	 NULL},
+	{"twep_host_attestation_payload_format",
+	 teep_host_attestation_payload_format, "(*~*)i", NULL},
 	{"twep_host_platform_status", teep_host_platform_status, "(*~*)i",
 	 NULL},
 	{"twep_host_teep_agent_measurement_sha256",

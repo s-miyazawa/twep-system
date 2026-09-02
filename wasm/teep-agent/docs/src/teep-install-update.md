@@ -48,14 +48,15 @@ Observed artifacts:
 
 `sign_query_response` builds the QueryResponse payload with
 `build_query_response_payload` and signs it with
-`cose::sign_demo_agent_esp256_cose_sign1`.
+`cose::sign_agent_esp256_cose_sign1`, which performs the raw signature operation
+with the fixed development key held in the Wasm artifact.
 
 If the QueryRequest has no attestation challenge:
 
 1. `teep::query_response_payload` reads token option `19`.
 2. The requested component id is added to the requested TC list.
 3. The token is returned in the QueryResponse.
-4. The payload is signed with the development agent key.
+4. Rust constructs COSE_Sign1 and signs its Sig_structure with the selected fixed development Agent key.
 
 If the QueryRequest has an attestation challenge:
 
@@ -64,7 +65,7 @@ If the QueryRequest has an attestation challenge:
 3. `evidence::create_eat_evidence` constructs the Generic EAT and signs it with
    the fixed development ES256 Evidence key inside the Rust TEEP_Agent.
 4. `teep::query_response_payload_with_attestation` builds the payload with evidence.
-5. The payload is signed with the development agent key.
+5. The payload is signed with the same selected Wasm-held development key.
 
 If `teep-agent/dev-agent-public-key.cbor` exists, the alternate development
 signer is used. This is a development feature for observing real AttesTAM
@@ -139,7 +140,7 @@ TEEP session progressed.
 ## Success Send and Freshness
 
 `post_success` builds a TEEP Success payload containing a SUIT report with
-`suit::success_response_payload`, signs it with the development agent key, and
+`suit::success_response_payload`, signs it with the selected Wasm-held development key, and
 POSTs it to AttesTAM. Before the Success POST, `session::dev_sequence_is_fresh`
 checks sequence freshness.
 

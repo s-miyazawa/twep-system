@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: BSD-2-Clause
 use alloc::vec::Vec;
 
+use coset::CoseKeyBuilder;
 use coset::{
-    iana, Algorithm, CborSerializable, CoseKeyBuilder, CoseSign1, CoseSign1Builder, HeaderBuilder,
+    iana, Algorithm, CborSerializable, CoseSign1, CoseSign1Builder, HeaderBuilder,
     TaggedCborSerializable,
 };
-use p256::ecdsa::{signature::Signer, signature::Verifier, Signature, SigningKey, VerifyingKey};
+use p256::ecdsa::{signature::Signer, SigningKey};
+use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 
 // SECURITY: The private scalars below are published, intentionally insecure
 // fixtures for disposable demos and automated tests. Never use them in
@@ -89,15 +91,15 @@ pub(crate) enum CoseSign1VerificationError {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DemoAgentSigner {
-    Default,
-    Alternate,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CoseSign1SigningError {
     EncodeFailed,
     KeyRejected,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DemoAgentSigner {
+    Default,
+    Alternate,
 }
 
 fn outer_teep_cose_sign1(input: &[u8]) -> Result<CoseSign1, CoseSign1VerificationError> {
@@ -223,25 +225,15 @@ where
     })
 }
 
-pub(crate) fn sign_demo_agent_esp256_cose_sign1(
+pub(crate) fn sign_agent_esp256_cose_sign1(
     payload: &[u8],
     signer: DemoAgentSigner,
 ) -> Result<Vec<u8>, CoseSign1SigningError> {
-    let (private_key, public_x, public_y) = match signer {
-        DemoAgentSigner::Default => (
-            DEMO_AGENT_PRIVATE_KEY_D,
-            DEMO_AGENT_PUBLIC_KEY_X,
-            DEMO_AGENT_PUBLIC_KEY_Y,
-        ),
-        DemoAgentSigner::Alternate => (
-            DEMO_TAM_PRIVATE_KEY_D,
-            DEMO_TAM_PUBLIC_KEY_X,
-            DEMO_TAM_PUBLIC_KEY_Y,
-        ),
-    };
-    let kid = cose_key_thumbprint(public_x, public_y)?;
+    let (private_key, _, _) = demo_agent_key_material(signer);
     let signing_key =
         SigningKey::from_slice(&private_key).map_err(|_| CoseSign1SigningError::KeyRejected)?;
+    let public_key = demo_agent_public_cose_key(signer)?;
+    let kid = agent_key_kid(&public_key)?;
     let protected = HeaderBuilder::new()
         .algorithm(iana::Algorithm::ESP256)
         .build();
@@ -259,6 +251,51 @@ pub(crate) fn sign_demo_agent_esp256_cose_sign1(
     sign1
         .to_tagged_vec()
         .map_err(|_| CoseSign1SigningError::EncodeFailed)
+}
+
+fn demo_agent_key_material(signer: DemoAgentSigner) -> ([u8; 32], [u8; 32], [u8; 32]) {
+    match signer {
+        DemoAgentSigner::Default => (
+            DEMO_AGENT_PRIVATE_KEY_D,
+            DEMO_AGENT_PUBLIC_KEY_X,
+            DEMO_AGENT_PUBLIC_KEY_Y,
+        ),
+        DemoAgentSigner::Alternate => (
+            DEMO_TAM_PRIVATE_KEY_D,
+            DEMO_TAM_PUBLIC_KEY_X,
+            DEMO_TAM_PUBLIC_KEY_Y,
+        ),
+    }
+}
+
+pub(crate) fn demo_agent_public_cose_key(
+    signer: DemoAgentSigner,
+) -> Result<Vec<u8>, CoseSign1SigningError> {
+    let (_, x, y) = demo_agent_key_material(signer);
+    CoseKeyBuilder::new_ec2_pub_key(iana::EllipticCurve::P_256, x.to_vec(), y.to_vec())
+        .algorithm(iana::Algorithm::ESP256)
+        .build()
+        .to_vec()
+        .map_err(|_| CoseSign1SigningError::EncodeFailed)
+}
+
+fn agent_key_kid(public_key: &[u8]) -> Result<[u8; 32], CoseSign1SigningError> {
+    if public_key.len() != 77
+        || public_key[..10] != [0xa5, 0x01, 0x02, 0x03, 0x28, 0x20, 0x01, 0x21, 0x58, 0x20]
+        || public_key[42..45] != [0x22, 0x58, 0x20]
+    {
+        return Err(CoseSign1SigningError::KeyRejected);
+    }
+    let mut sec1 = [0u8; 65];
+    sec1[0] = 0x04;
+    sec1[1..33].copy_from_slice(&public_key[10..42]);
+    sec1[33..].copy_from_slice(&public_key[45..77]);
+    VerifyingKey::from_sec1_bytes(&sec1).map_err(|_| CoseSign1SigningError::KeyRejected)?;
+    let mut x = [0u8; 32];
+    let mut y = [0u8; 32];
+    x.copy_from_slice(&public_key[10..42]);
+    y.copy_from_slice(&public_key[45..77]);
+    cose_key_thumbprint(x, y)
 }
 
 pub(crate) fn sign_demo_evidence_es256_cose_sign1(
@@ -502,12 +539,14 @@ mod tests {
     #[test]
     fn sign_demo_agent_cose_sign1_uses_default_agent_key() {
         let payload = b"\x82\x02\xa0";
-        let signed = sign_demo_agent_esp256_cose_sign1(payload, DemoAgentSigner::Default)
-            .expect("signed COSE");
+        let signed =
+            sign_agent_esp256_cose_sign1(payload, DemoAgentSigner::Default).expect("signed COSE");
         let sign1 = CoseSign1::from_tagged_slice(&signed).expect("tagged COSE_Sign1");
 
         assert_eq!(sign1.payload.as_deref(), Some(payload.as_slice()));
         assert!(outer_teep_cose_sign1_uses_esp256(&sign1));
+        assert!(sign1.protected.header.key_id.is_empty());
+        assert_eq!(sign1.unprotected.key_id.len(), 32);
         assert_eq!(
             sign1.unprotected.key_id,
             cose_key_thumbprint(DEMO_AGENT_PUBLIC_KEY_X, DEMO_AGENT_PUBLIC_KEY_Y)
@@ -545,10 +584,41 @@ mod tests {
     }
 
     #[test]
+    fn platform_agent_key_requires_canonical_valid_ec2_coordinates() {
+        let key = CoseKeyBuilder::new_ec2_pub_key(
+            iana::EllipticCurve::P_256,
+            DEMO_AGENT_PUBLIC_KEY_X.to_vec(),
+            DEMO_AGENT_PUBLIC_KEY_Y.to_vec(),
+        )
+        .algorithm(iana::Algorithm::ESP256)
+        .build()
+        .to_vec()
+        .expect("canonical key");
+        assert_eq!(
+            agent_key_kid(&key).unwrap(),
+            cose_key_thumbprint(DEMO_AGENT_PUBLIC_KEY_X, DEMO_AGENT_PUBLIC_KEY_Y).unwrap()
+        );
+
+        let mut noncanonical = key.clone();
+        noncanonical.push(0);
+        assert_eq!(
+            agent_key_kid(&noncanonical),
+            Err(CoseSign1SigningError::KeyRejected)
+        );
+
+        let mut reversed_x = key;
+        reversed_x[10..42].reverse();
+        assert_eq!(
+            agent_key_kid(&reversed_x),
+            Err(CoseSign1SigningError::KeyRejected)
+        );
+    }
+
+    #[test]
     fn sign_demo_agent_cose_sign1_can_use_alternate_agent_key() {
         let payload = b"\x82\x02\xa0";
-        let signed = sign_demo_agent_esp256_cose_sign1(payload, DemoAgentSigner::Alternate)
-            .expect("signed COSE");
+        let signed =
+            sign_agent_esp256_cose_sign1(payload, DemoAgentSigner::Alternate).expect("signed COSE");
         let sign1 = CoseSign1::from_tagged_slice(&signed).expect("tagged COSE_Sign1");
 
         assert_eq!(sign1.payload.as_deref(), Some(payload.as_slice()));

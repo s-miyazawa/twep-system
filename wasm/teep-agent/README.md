@@ -11,6 +11,10 @@ not a normal user-command app. The host loads it in a separate WAMR instance
 and grants it only the TEEP-specific hostcalls under the `twep_teep_env`
 import module.
 
+Evidence payload and media-type bytes come from the privileged platform
+boundary and are emitted only as a validated pair. The Agent caps Evidence at
+30 KiB and the complete signed AttesTAM request at 32 KiB.
+
 ## Responsibilities
 
 - Resolve a user command to a Catalog File entry and verify the cached Wasm
@@ -39,8 +43,9 @@ final-verified TEEP implementation.
 - `mock` and `attestam-insecure` may use development catalog/app seeding and
   development AttesTAM flows.
 - `attestam-verified` is milestone-gated. Linux performs dry-run observation and
-  returns `teep.verified_required`. M9.1 TrustZone is acceptance-only. D047 M9.2
-  may commit only the verified default Catalog TC through protected storage and
+  returns `teep.verified_required`. The acceptance-only TrustZone milestone
+  stops after protected acceptance. The Catalog-only milestone may commit only
+  the verified default Catalog TC through protected storage and
   send Success after readback; it still forbids mock installation, app
   promotion/execution, and all `attestam-insecure` promotion shortcuts.
 - Linux protected storage is observation-only. File-backed sealed storage under
@@ -62,6 +67,7 @@ Implemented wrappers live in `src/host_io.rs` and cover:
 - protected object read
 - HTTP POST
 - evidence creation
+- Wasm-held fixed development Agent key selection and ESP256 signing (PoC-only and artifact-extractable)
 - platform status
 - random bytes
 - Unix time in milliseconds

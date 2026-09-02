@@ -48,7 +48,7 @@ func TestAttestamInsecureTwepdCLI(t *testing.T) {
 	defer server.Close()
 
 	stateDir := t.TempDir()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -146,7 +146,7 @@ func TestAttestamInsecureNonEmptyTEEPResponseIsUnsupported(t *testing.T) {
 	defer server.Close()
 
 	stateDir := t.TempDir()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -284,7 +284,7 @@ func TestAttestamInsecurePromotesWasmAppUpdate(t *testing.T) {
 	defer server.Close()
 
 	stateDir := t.TempDir()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -414,7 +414,7 @@ func TestAttestamInsecureRejectsInvalidWasmAppUpdates(t *testing.T) {
 			defer server.Close()
 
 			stateDir := t.TempDir()
-			socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+			socketPath := shortSocketPath(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
@@ -483,7 +483,7 @@ func TestAttestamInsecureWithoutDemoModeRejectsHTTP(t *testing.T) {
 	defer server.Close()
 
 	stateDir := t.TempDir()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -539,7 +539,7 @@ func TestAttestamInsecureNetworkError(t *testing.T) {
 
 	attestamURL := unusedLocalHTTPURL(t)
 	stateDir := t.TempDir()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -592,7 +592,7 @@ func TestAttestamVerifiedRejectsInsecureDemoAtStartup(t *testing.T) {
 	binDir, repoRoot := e2eEnv(t)
 
 	stateDir := t.TempDir()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -647,7 +647,7 @@ func TestAttestamVerifiedDryRunDoesNotPromoteAppE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -766,7 +766,7 @@ func TestAttestamVerifiedInputUpdateCOSEDoesNotPromoteAppE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -979,7 +979,7 @@ func TestAttestamVerifiedInputUpdateCOSEUsesProtectedSequenceFreshnessE2E(t *tes
 		t.Fatal(err)
 	}
 
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -1102,7 +1102,7 @@ func TestAttestamVerifiedInputUpdateCOSERejectsProtectedSequenceReplayE2E(t *tes
 		t.Fatal(err)
 	}
 
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -1533,7 +1533,7 @@ func TestAttestamVerifiedInputCatalogUpdateCOSEDoesNotPromoteCatalogE2E(t *testi
 		t.Fatal(err)
 	}
 
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -1662,9 +1662,19 @@ func waitForSocket(t *testing.T, socketPath string) {
 	t.Fatalf("timeout waiting for socket %s", socketPath)
 }
 
+func shortSocketPath(t *testing.T) string {
+	t.Helper()
+	socketDir, err := os.MkdirTemp("", "twep-e2e-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(socketDir) })
+	return filepath.Join(socketDir, "twepd.sock")
+}
+
 func runAttestamVerifiedDryRun(t *testing.T, ctx context.Context, binDir string, repoRoot string, stateDir string, attestamURL string, command string) {
 	t.Helper()
-	socketPath := filepath.Join(stateDir, "run", "twepd.sock")
+	socketPath := shortSocketPath(t)
 	twepd := exec.CommandContext(ctx,
 		filepath.Join(binDir, "twepd"),
 		"--socket", socketPath,
@@ -2082,34 +2092,6 @@ func cborBytesValue(t *testing.T, got map[string]any, key string) []byte {
 		t.Fatalf("%s = %#v, want bytes", key, got[key])
 	}
 	return value
-}
-
-// assertLinuxAttestamInsecureEvidenceObservation validates the explicitly
-// insecure install flow. Generation zero is never a verified-mode acceptance.
-func assertLinuxAttestamInsecureEvidenceObservation(t *testing.T, path string) {
-	t.Helper()
-	bytes := readFileBytes(t, path)
-	var got map[string]any
-	if err := cbor.Unmarshal(bytes, &got); err != nil {
-		t.Fatalf("decode %s: %v", path, err)
-	}
-	want := map[string]any{
-		"schema_version":           uint64(2),
-		"decision_source":          "attestam-signed-update",
-		"tam_response_verified":    true,
-		"challenge_response_bound": true,
-		"acceptance_generation":    uint64(0),
-	}
-	for key, wantValue := range want {
-		if got[key] != wantValue {
-			t.Fatalf("%s = %#v, want %#v in %s", key, got[key], wantValue, path)
-		}
-	}
-	for _, legacyKey := range []string{"verifier_result", "nonce_match", "cnf_key_match", "platform_match"} {
-		if _, ok := got[legacyKey]; ok {
-			t.Fatalf("%s present in Linux AttesTAM evidence observation", legacyKey)
-		}
-	}
 }
 
 func readFileBytes(t *testing.T, path string) []byte {

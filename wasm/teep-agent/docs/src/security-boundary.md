@@ -8,7 +8,7 @@ crate. It is important not to mix them.
 
 `attestam-insecure` is a convenient path for development and E2E.
 
-- Sign QueryResponse / Success with a development agent key using COSE_Sign1.
+- Own the PoC-only fixed development scalar and construct and sign QueryResponse / Success COSE_Sign1 in Rust. The scalar is extractable from the Wasm artifact and is not a production credential.
 - Hash-verify and store the integrated payload from AttesTAM Update.
 - Save a `twep-app-v1` app TC to `apps/<command>.wasm`.
 - Generate a minimal Catalog from `source=attestam-insecure` app TCs.

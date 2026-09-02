@@ -73,7 +73,7 @@ func TestAttestamLiveChallengeResponseUpdate(t *testing.T) {
 	}
 
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "last-attestation-query-response-status.txt"), []byte("host-status=ok\n"))
-	assertLinuxAttestamInsecureEvidenceObservation(t, filepath.Join(stateDir, "teep-agent", "verified-evidence-result.cbor"))
+	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "verified-evidence-result.cbor"))
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "update-payload-hash-status.txt"), []byte("payload-hash=ok\n"))
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "success-status.txt"), []byte("host-status=ok\n"))
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "last-session-result.txt"), []byte("session-result=no-content\n"))

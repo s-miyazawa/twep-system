@@ -12,6 +12,17 @@ use crate::{cbor, cose::sign_demo_evidence_es256_cose_sign1};
 #[cfg(test)]
 use ciborium::value::Value;
 
+pub(crate) const GENERIC_EAT_FORMAT: &[u8] =
+    b"application/eat+cwt; eat_profile=\"urn:ietf:rfc:rfc9711\"";
+pub(crate) const MAX_EVIDENCE_BYTES: usize = 30 * 1024;
+pub(crate) const MAX_FORMAT_BYTES: usize = 256;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AttestationEvidence {
+    pub(crate) format: Vec<u8>,
+    pub(crate) payload: Vec<u8>,
+}
+
 pub(crate) const VERIFIED_EVIDENCE_RESULT_PATH: &[u8] = b"teep-agent/verified-evidence-result.cbor";
 const DEMO_AGENT_EAT_UEID: &[u8] = &[
     0x01, 0x98, 0xf5, 0x0a, 0x4f, 0xf6, 0xc0, 0x58, 0x61, 0xc8, 0x86, 0x0d, 0x13, 0xa6, 0x38, 0xea,
@@ -26,33 +37,46 @@ const DEMO_AGENT_EAT_MEASUREMENT_DIGEST: &[u8] = &[
 pub(crate) enum EvidenceError {
     InvalidArgument,
     MissingChallenge,
+    Unsupported,
     BufferTooSmall(usize),
+    InvalidLength,
     Internal,
 }
 
 pub(crate) fn query_request_challenge(input: &[u8]) -> Option<&[u8]> {
+    query_request_challenge_result(input).ok().flatten()
+}
+
+pub(crate) fn query_request_challenge_result(input: &[u8]) -> Result<Option<&[u8]>, ()> {
+    query_request_bytes_option(input, 2)
+}
+
+pub(crate) fn query_request_bytes_option(
+    input: &[u8],
+    wanted_key: usize,
+) -> Result<Option<&[u8]>, ()> {
     let mut off = 0usize;
-    let (major, len) = cbor::head(input, &mut off)?;
+    let (major, len) = cbor::head(input, &mut off).ok_or(())?;
     if major != 4 || len < 2 {
-        return None;
+        return Err(());
     }
     if !cbor::skip(input, &mut off) {
-        return None;
+        return Err(());
     }
-    let (major, pairs) = cbor::head(input, &mut off)?;
+    let (major, pairs) = cbor::head(input, &mut off).ok_or(())?;
     if major != 5 {
-        return None;
+        return Err(());
     }
     for _ in 0..pairs {
-        let (key_major, key_value) = cbor::head(input, &mut off)?;
-        if key_major == 0 && key_value == 2 {
-            return cbor::bytes(input, &mut off);
+        let (key_major, key_value) = cbor::head(input, &mut off).ok_or(())?;
+        if key_major == 0 && key_value == wanted_key {
+            return cbor::bytes(input, &mut off).map(Some).ok_or(());
         }
         if !cbor::skip(input, &mut off) {
-            return None;
+            return Err(());
         }
     }
-    None
+    Ok(None)
 }
 
 pub(crate) fn create_eat_evidence<'a>(
@@ -75,6 +99,52 @@ pub(crate) fn create_eat_evidence<'a>(
     }
     out[..evidence.len()].copy_from_slice(&evidence);
     Ok(&out[..evidence.len()])
+}
+
+pub(crate) fn create_platform_evidence<F>(
+    challenge: &[u8],
+    agent_public_key_cose: &[u8],
+    mut platform_create_evidence: F,
+    format: Vec<u8>,
+) -> Result<AttestationEvidence, EvidenceError>
+where
+    F: FnMut(&[u8], &[u8], &mut [u8]) -> Result<usize, EvidenceError>,
+{
+    if challenge.is_empty() || agent_public_key_cose.is_empty() {
+        return Err(EvidenceError::InvalidArgument);
+    }
+    if challenge.len() < 8 || challenge.len() > 64 {
+        return Err(EvidenceError::MissingChallenge);
+    }
+    let required = match platform_create_evidence(challenge, agent_public_key_cose, &mut []) {
+        Err(EvidenceError::BufferTooSmall(required)) => required,
+        Ok(required) => required,
+        Err(err) => return Err(err),
+    };
+    if required == 0 || required > MAX_EVIDENCE_BYTES {
+        return Err(EvidenceError::InvalidLength);
+    }
+    let mut payload = alloc::vec![0; required];
+    let written = platform_create_evidence(challenge, agent_public_key_cose, &mut payload)?;
+    if written != required || written > payload.len() {
+        return Err(EvidenceError::InvalidLength);
+    }
+    if format.is_empty()
+        || format.len() > MAX_FORMAT_BYTES
+        || core::str::from_utf8(&format).is_err()
+    {
+        return Err(EvidenceError::InvalidArgument);
+    }
+    Ok(AttestationEvidence { format, payload })
+}
+
+pub(crate) fn host_status_to_evidence_error(status: i32, out_len: usize) -> EvidenceError {
+    match status {
+        1 => EvidenceError::InvalidArgument,
+        2 => EvidenceError::BufferTooSmall(out_len),
+        8 => EvidenceError::Unsupported,
+        _ => EvidenceError::Internal,
+    }
 }
 
 fn encode_generic_eat(challenge: &[u8], agent_public_key_cose: &[u8]) -> Option<Vec<u8>> {

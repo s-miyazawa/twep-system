@@ -36,6 +36,7 @@ extern "C" {
         buf_cap: u32,
         out_len_ptr: u32,
     ) -> i32;
+    fn twep_host_attestation_payload_format(buf_ptr: u32, buf_cap: u32, out_len_ptr: u32) -> i32;
     fn twep_host_platform_status(buf_ptr: u32, buf_cap: u32, out_len_ptr: u32) -> i32;
     fn twep_host_teep_agent_measurement_sha256(buf_ptr: u32, buf_cap: u32, out_len_ptr: u32)
         -> i32;
@@ -162,7 +163,7 @@ pub(crate) fn read_protected_len(object_name: &[u8]) -> Result<Option<u32>, i32>
             &mut out_len as *mut u32 as u32,
         )
     };
-    if status == 3 || status == 8 {
+    if status == 3 {
         Ok(None)
     } else if status == 0 || status == 2 {
         Ok(Some(out_len))
@@ -234,7 +235,31 @@ pub(crate) fn create_evidence(
             challenge.len() as u32,
             agent_public_key.as_ptr() as u32,
             agent_public_key.len() as u32,
-            out.as_mut_ptr() as u32,
+            if out.is_empty() {
+                0
+            } else {
+                out.as_mut_ptr() as u32
+            },
+            out.len() as u32,
+            &mut out_len as *mut u32 as u32,
+        )
+    };
+    if status == 0 {
+        Ok(out_len as usize)
+    } else {
+        Err((status, out_len as usize))
+    }
+}
+
+pub(crate) fn attestation_payload_format(out: &mut [u8]) -> Result<usize, (i32, usize)> {
+    let mut out_len = 0u32;
+    let status = unsafe {
+        twep_host_attestation_payload_format(
+            if out.is_empty() {
+                0
+            } else {
+                out.as_mut_ptr() as u32
+            },
             out.len() as u32,
             &mut out_len as *mut u32 as u32,
         )

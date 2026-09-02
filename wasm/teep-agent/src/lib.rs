@@ -34,9 +34,9 @@ use suit::twep_app_component_id;
 
 struct BumpAllocator;
 
-#[cfg(not(test))]
+#[cfg(all(not(test), feature = "heap-512k-diagnostic"))]
 const HEAP_SIZE: usize = 512 * 1024;
-#[cfg(test)]
+#[cfg(any(test, not(feature = "heap-512k-diagnostic")))]
 const HEAP_SIZE: usize = 2 * 1024 * 1024;
 
 #[repr(align(16))]
@@ -224,5 +224,8 @@ mod tests {
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo<'_>) -> ! {
+    #[cfg(target_arch = "wasm32")]
+    core::arch::wasm32::unreachable();
+    #[cfg(not(target_arch = "wasm32"))]
     loop {}
 }

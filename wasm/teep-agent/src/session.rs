@@ -5,7 +5,8 @@ use alloc::vec::Vec;
 use crate::catalog::resolve_from_catalog;
 use crate::cbor;
 use crate::cose::{
-    outer_teep_cose_sign1_payload_unverified, sign_demo_agent_esp256_cose_sign1, DemoAgentSigner,
+    demo_agent_public_cose_key, outer_teep_cose_sign1_payload_unverified,
+    sign_agent_esp256_cose_sign1, DemoAgentSigner,
 };
 use crate::evidence;
 use crate::freshness::{dev_sequence_freshness_update, dev_sequence_is_fresh_bytes};
@@ -15,8 +16,8 @@ use crate::suit::{
     SuitManifestInfo, TeepUpdateCandidate, TeepUpdateCandidateError,
 };
 use crate::teep::{
-    query_response_payload, query_response_payload_with_attestation, teep_message_token,
-    teep_message_type, QueryResponsePayloadError, TEEP_TYPE_QUERY_REQUEST, TEEP_TYPE_UPDATE,
+    query_response_payload, teep_message_token, teep_message_type, TEEP_TYPE_QUERY_REQUEST,
+    TEEP_TYPE_UPDATE,
 };
 use crate::verified::{self, VerificationState};
 use crate::wasm_signature;
@@ -81,6 +82,7 @@ struct SessionContext<'a> {
     requested_component_id: &'a [u8],
     policy: SessionPolicy,
     session_token: Option<&'a [u8]>,
+    signer: DemoAgentSigner,
 }
 
 pub(crate) fn run_resolve_app(
@@ -214,6 +216,12 @@ pub(crate) fn run_verified_poc_resolve(
                     b"verified-protected-app\n",
                 )
             } else {
+                if !host_io::write_file(
+                    LAST_TEEP_SESSION_RESULT_PATH,
+                    b"session-result=teep.verified_required\n",
+                ) {
+                    return 127;
+                }
                 write_output(
                     out_desc_ptr,
                     &error_output(

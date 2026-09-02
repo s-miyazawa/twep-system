@@ -2850,12 +2850,12 @@ func TestAttestamInsecureChallengeAffirmingUpdateInstallsApp(t *testing.T) {
 	assertFileBytes(t, filepath.Join(stateDir, "apps", "helloworld.wasm"), appPayload)
 }
 
-func TestAttestamInsecureRejectsRollbackSequenceFromDevState(t *testing.T) {
+func TestAttestamInsecureRejectsSequenceZeroReplayFromDevState(t *testing.T) {
 	command := "remotehello"
 	componentID := twepAppComponentID(command)
 	appPayload := []byte("not executed")
 	appDigest := sha256.Sum256(appPayload)
-	updateManifest := fixtureAppSUITManifest(componentID, "#remotehello.wasm", appPayload, appDigest[:], 1)
+	updateManifest := fixtureAppSUITManifest(componentID, "#remotehello.wasm", appPayload, appDigest[:], 0)
 	updateToken := []byte{0xca, 0xfe, 0xba, 0xbe}
 	updatePayload := append([]byte{0x82, 0x03, 0xa2, 0x09, 0x81}, cborBstr(updateManifest)...)
 	updatePayload = append(updatePayload, 0x13)
@@ -2906,7 +2906,7 @@ func TestAttestamInsecureRejectsRollbackSequenceFromDevState(t *testing.T) {
 	}
 	devFreshness := cborMap(nil, 1)
 	devFreshness = cborBytes(devFreshness, componentID)
-	devFreshness = cborUint(devFreshness, 1)
+	devFreshness = cborUint(devFreshness, 0)
 	if err := os.WriteFile(filepath.Join(stateDir, "teep-agent", "dev-sequence-freshness.cbor"), devFreshness, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -2931,7 +2931,7 @@ func TestAttestamInsecureRejectsRollbackSequenceFromDevState(t *testing.T) {
 		t.Fatalf("posted body count = %d, want 2", len(postedBodies))
 	}
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "dev-sequence-freshness.cbor"), devFreshness)
-	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "update-manifest-sequence-number.txt"), []byte("sequence-number=1\n"))
+	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "update-manifest-sequence-number.txt"), []byte("sequence-number=0\n"))
 	assertFileBytes(t, filepath.Join(stateDir, "teep-agent", "update-payload-hash-status.txt"), []byte("payload-hash=ok\n"))
 	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "success.cose"))
 	assertPathMissing(t, filepath.Join(stateDir, "teep-agent", "success-status.txt"))
@@ -4229,24 +4229,42 @@ func mustTEEPQueryResponseAttestationPayload(t *testing.T, input []byte) []byte 
 	if !ok || major != 5 {
 		t.Fatalf("TEEP options head = major %d value %d ok %v, want map", major, pairs, ok)
 	}
+	var payload []byte
+	var format []byte
 	for i := 0; i < pairs; i++ {
 		keyMajor, key, ok := cborHead(input, &off)
 		if !ok {
 			t.Fatal("TEEP options key missing")
 		}
 		if keyMajor == 0 && key == 6 {
-			payload, ok := cborBytesView(input, &off)
+			value, ok := cborBytesView(input, &off)
 			if !ok {
 				t.Fatal("attestation-payload is not a CBOR bstr")
 			}
-			return append([]byte(nil), payload...)
+			payload = append([]byte(nil), value...)
+			continue
+		}
+		if keyMajor == 0 && key == 12 {
+			textMajor, textLen, ok := cborHead(input, &off)
+			if !ok || textMajor != 3 || textLen > len(input)-off {
+				t.Fatal("attestation-payload-format is not a CBOR tstr")
+			}
+			format = append([]byte(nil), input[off:off+int(textLen)]...)
+			off += int(textLen)
+			continue
 		}
 		if !cborSkip(input, &off) {
 			t.Fatal("failed to skip TEEP option value")
 		}
 	}
-	t.Fatal("attestation-payload option not found")
-	return nil
+	if len(payload) == 0 {
+		t.Fatal("attestation-payload option not found")
+	}
+	const genericEATFormat = `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`
+	if string(format) != genericEATFormat {
+		t.Fatalf("attestation-payload-format = %q, want %q", format, genericEATFormat)
+	}
+	return payload
 }
 
 func assertEATNonce(t *testing.T, input []byte, want []byte) {

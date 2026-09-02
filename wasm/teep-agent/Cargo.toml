@@ -12,6 +12,8 @@ crate-type = ["cdylib"]
 # Rebuild the historical M9.1 acceptance-only boundary for its live smoke.
 # Production/default builds remain on the M9.2 Catalog-only coordinator.
 m9-1-acceptance-only-smoke = []
+# Reproduce the former production heap boundary without changing production.
+heap-512k-diagnostic = []
 
 [dependencies]
 ciborium = { version = "0.2", default-features = false }

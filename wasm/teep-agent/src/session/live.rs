@@ -9,6 +9,7 @@ pub(super) fn run_attestam_session(
     requested_component_id: &[u8],
     policy: SessionPolicy,
 ) -> Result<Option<bool>, i32> {
+    let signer = demo_agent_signer();
     let mut http_buf = alloc::vec![
         0u8;
         if policy == SessionPolicy::VerifiedPocAcceptanceOnly {
@@ -65,7 +66,8 @@ pub(super) fn run_attestam_session(
 
     let session_token = teep_message_token(&payload).map(|token| token.to_vec());
 
-    let query_response = sign_query_response(out_desc_ptr, &payload, requested_component_id)?;
+    let query_response =
+        sign_query_response(out_desc_ptr, &payload, requested_component_id, signer)?;
     if !host_io::write_file(LAST_TEEP_QUERY_RESPONSE_PATH, &query_response.cose) {
         return Err(127);
     }
@@ -103,6 +105,7 @@ pub(super) fn run_attestam_session(
         requested_component_id,
         policy,
         session_token: session_token.as_deref(),
+        signer,
     };
     handle_session_response(
         &context,
@@ -202,6 +205,7 @@ fn handle_session_response(
                     context.attestam_url,
                     context.requested_component_id,
                     &body_payload,
+                    context.signer,
                 );
                 if result.is_ok() {
                     if let Some(observation) = acceptance_observation {
@@ -249,6 +253,7 @@ fn handle_session_response(
                             context.out_desc_ptr,
                             context.attestam_url,
                             &success_payload,
+                            context.signer,
                         )
                     }
                     Err(message) => Err(write_output(
@@ -267,6 +272,7 @@ fn handle_session_response(
         context.out_desc_ptr,
         &body_payload,
         context.requested_component_id,
+        context.signer,
     )?;
     if !host_io::write_file(
         LAST_TEEP_ATTESTATION_RESPONSE_PATH,
@@ -331,12 +337,12 @@ fn post_verified_component_success(
     out_desc_ptr: u32,
     attestam_url: &[u8],
     success_payload: &[u8],
+    signer: DemoAgentSigner,
 ) -> Result<bool, i32> {
     if !host_io::write_file(LAST_TEEP_SUCCESS_PAYLOAD_PATH, success_payload) {
         return Err(127);
     }
-    let success_cose = match sign_demo_agent_esp256_cose_sign1(success_payload, demo_agent_signer())
-    {
+    let success_cose = match sign_agent_esp256_cose_sign1(success_payload, signer) {
         Ok(signed) => signed,
         Err(_) => {
             return Err(write_output(
