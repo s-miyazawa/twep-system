@@ -12,10 +12,18 @@ internal pointers, Wasm memory pointers, or native runtime handles.
 - Buffers returned to Go are owned by C and must be released with
   `twep_wr_free_bytes`.
 
+The runtime selects exactly one platform backend at compile time and calls it
+directly; there is no runtime backend function table. Linux owns the REE WAMR
+lifecycle, OP-TEE invokes its TEEC execution helper, and the reserved Keystone
+backend fails initialization before WAMR starts. SGX selection is rejected at
+configure time until the complete secure runtime layer is present. Public C
+ABI v3 is unchanged.
+
 ## Source Layout
 
-- `src/runtime.c`: public ABI entry points, context lifecycle, state layout,
-  shared CBOR parsing helpers, and shared WAMR app-call helpers.
+- `src/runtime.c`: public ABI validation, compile-time backend dispatch,
+  context lifecycle, state layout, shared CBOR parsing helpers, and shared
+  WAMR app-call helpers.
 - `src/app_runtime.c`: general Trusted Wasm App loading, resource-limit
   application, app ABI calls, output extraction, and response assembly.
 - `src/catalog_resolver.c`: catalog lookup policy, TEEP_Agent resolve-app

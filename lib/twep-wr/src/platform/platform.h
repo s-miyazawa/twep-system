@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+struct twep_wr_context;
+
 typedef enum {
     TWEP_WR_PLATFORM_OK = 0,
     TWEP_WR_PLATFORM_ERR_IO = 1,

@@ -308,7 +308,11 @@ Errors across twep are classified into the following layers.
 ## Architecture Notes for Future TEE Migration
 
 - The C ABI of `twep-wr.so` becomes the boundary for TEE ports.
-- Separate platform-dependent processing into `lib/twep-wr/src/platform/<backend>/`. Implemented directories are `linux`, `optee-common`, `arm-optee`, and `riscv-optee`; `sgx` and `keystone` remain reserved portability boundaries.
+- Separate platform-dependent processing into `lib/twep-wr/src/platform/<backend>/`. Implemented directories are `linux`, `optee-common`, `arm-optee`, and `riscv-optee`; `sgx` remains unavailable until its complete secure runtime is present, and `keystone` is an explicit fail-closed stub.
+- `lib/twep-wr/src/runtime.c` selects exactly one backend through compile
+  definitions and calls it directly. Linux owns the REE WAMR lifecycle,
+  OP-TEE invokes its TEEC execution helper, and Keystone fails initialization
+  before WAMR starts. There is no runtime backend function table.
 - `platform/linux` is an REE-only development backend. Even if it provides a sealed-storage-like API, it must not be used for final verified security claims. In internal `twep-wr` platform metadata, treat the sealed storage security of this backend as `observation-only`.
 - Keep TEEC transport, protected storage, diagnostics, envelopes, host I/O, and execution in `platform/optee-common`; keep only architecture identity descriptors in `platform/arm-optee` and `platform/riscv-optee`. Do not pass REE state file I/O into the TA as arbitrary paths; treat it as byte transport for TA-managed object ids. Connect to the TA in `optee/twep-wr-ta/` through TEEC and handle REE FS Secure Storage write/read, trusted random/time, production WAMR execution, and TEEP_Agent hostcall resume. This repository adopts OP-TEE REE FS Secure Storage as the formal OP-TEE secure storage policy and permanently configures `CFG_REE_FS=y` and `CFG_RPMB_FS=n`. Because rollback attacks are outside the threat model, `sealed-storage-security=tee-ree-fs-secure-storage` may be used in final verified mode, while `sealed-storage-rollback-protected=false` remains diagnostic information.
 - For `platform/sgx` and `platform/keystone`, reserve only the backend boundaries and return `unsupported` for protected storage until it is mapped to platform-specific sealed storage.

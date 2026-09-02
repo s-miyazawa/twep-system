@@ -53,7 +53,7 @@ typedef enum {
 
 struct twep_wr_context {
     uint32_t abi_version;
-    bool runtime_initialized;
+    void *backend_state;
     char *state_dir;
     char *resolver_mode;
     char *attestam_url;
@@ -63,6 +63,19 @@ struct twep_wr_context {
     uint32_t max_response_bytes;
     twep_wr_host_io_t host_io;
 };
+
+#if (defined(TWEP_WR_PLATFORM_BACKEND_LINUX) + defined(TWEP_WR_PLATFORM_BACKEND_OPTEE) \
+     + defined(TWEP_WR_PLATFORM_BACKEND_SGX) + defined(TWEP_WR_PLATFORM_BACKEND_KEYSTONE)) != 1
+#error "exactly one TWEP_WR_PLATFORM_BACKEND_* definition is required"
+#endif
+
+#ifdef TWEP_WR_PLATFORM_BACKEND_SGX
+twep_wr_status_t twep_wr_sgx_init(twep_wr_context_t *ctx, void **out_backend_state);
+twep_wr_status_t twep_wr_sgx_execute(const twep_wr_context_t *ctx, void *backend_state,
+                                     const twep_wr_normalized_request_t *request,
+                                     twep_wr_owned_bytes_t *out_response_cbor);
+void twep_wr_sgx_shutdown(void *backend_state);
+#endif
 
 twep_wr_status_t twep_wr_register_teep_agent_hostcalls(void);
 const twep_wr_context_t *twep_wr_teep_agent_context_from_exec_env(wasm_exec_env_t exec_env);
@@ -106,10 +119,8 @@ twep_wr_status_t twep_wr_call_free(wasm_exec_env_t exec_env, wasm_module_inst_t 
 twep_wr_status_t twep_wr_run_app_wasm(const twep_wr_context_t *ctx, const twep_wr_normalized_request_t *request,
                                       twep_wr_owned_bytes_t *out_response_cbor);
 
-#ifdef TWEP_WR_PLATFORM_BACKEND_OPTEE
 twep_wr_status_t twep_wr_optee_execute(const twep_wr_context_t *ctx, const twep_wr_normalized_request_t *request,
                                            twep_wr_owned_bytes_t *out_response_cbor);
-#endif
 
 twep_wr_status_t twep_wr_make_response(const char *request_id, const uint8_t *stdout_bytes, size_t stdout_len,
                                        const uint8_t *app_output, size_t app_output_len,

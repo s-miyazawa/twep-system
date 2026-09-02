@@ -15,6 +15,9 @@ twep_wr_status_t twep_wr_init(
     const twep_wr_config_t *config,
     twep_wr_context_t **out_ctx)
 {
+    if (out_ctx != NULL) {
+        *out_ctx = NULL;
+    }
     if (config == NULL || out_ctx == NULL) {
         return TWEP_WR_ERR_INVALID_ARGUMENT;
     }
@@ -33,7 +36,6 @@ twep_wr_status_t twep_wr_init(
     if (strcmp(config->resolver_mode, "attestam-verified") == 0 && config->insecure_demo_mode) {
         return TWEP_WR_ERR_INVALID_ARGUMENT;
     }
-
     twep_wr_context_t *ctx = (twep_wr_context_t *)calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
         return TWEP_WR_ERR_NO_MEMORY;
@@ -52,24 +54,25 @@ twep_wr_status_t twep_wr_init(
     ctx->default_timeout_ms = config->default_timeout_ms == 0 ? 5000u : config->default_timeout_ms;
     ctx->max_request_bytes = config->max_request_bytes;
     ctx->max_response_bytes = config->max_response_bytes;
-#ifndef TWEP_WR_PLATFORM_BACKEND_OPTEE
+    twep_wr_status_t backend_status = TWEP_WR_OK;
+#if defined(TWEP_WR_PLATFORM_BACKEND_LINUX)
     if (!wasm_runtime_init()) {
-        free(ctx->attestam_url);
-        free(ctx->resolver_mode);
-        free(ctx->state_dir);
-        free(ctx);
-        return TWEP_WR_ERR_INIT;
+        backend_status = TWEP_WR_ERR_INIT;
+    } else {
+        ctx->backend_state = ctx;
+        backend_status = twep_wr_register_teep_agent_hostcalls();
     }
-    if (twep_wr_register_teep_agent_hostcalls() != TWEP_WR_OK) {
-        wasm_runtime_destroy();
-        free(ctx->attestam_url);
-        free(ctx->resolver_mode);
-        free(ctx->state_dir);
-        free(ctx);
-        return TWEP_WR_ERR_INIT;
-    }
-    ctx->runtime_initialized = true;
+#elif defined(TWEP_WR_PLATFORM_BACKEND_OPTEE)
+    ctx->backend_state = NULL;
+#elif defined(TWEP_WR_PLATFORM_BACKEND_SGX)
+    backend_status = twep_wr_sgx_init(ctx, &ctx->backend_state);
+#elif defined(TWEP_WR_PLATFORM_BACKEND_KEYSTONE)
+    backend_status = TWEP_WR_ERR_INIT;
 #endif
+    if (backend_status != TWEP_WR_OK) {
+        twep_wr_shutdown(ctx);
+        return backend_status;
+    }
     ctx->abi_version = TWEP_WR_ABI_VERSION;
     *out_ctx = ctx;
     return TWEP_WR_OK;
@@ -111,10 +114,14 @@ twep_wr_status_t twep_wr_execute(
     }
 
     twep_wr_status_t status;
-#ifdef TWEP_WR_PLATFORM_BACKEND_OPTEE
-    status = twep_wr_optee_execute(ctx, request, out_response_cbor);
-#else
+#if defined(TWEP_WR_PLATFORM_BACKEND_LINUX)
     status = twep_wr_run_app_wasm(ctx, request, out_response_cbor);
+#elif defined(TWEP_WR_PLATFORM_BACKEND_OPTEE)
+    status = twep_wr_optee_execute(ctx, request, out_response_cbor);
+#elif defined(TWEP_WR_PLATFORM_BACKEND_SGX)
+    status = twep_wr_sgx_execute(ctx, ctx->backend_state, request, out_response_cbor);
+#elif defined(TWEP_WR_PLATFORM_BACKEND_KEYSTONE)
+    status = TWEP_WR_ERR_INIT;
 #endif
     if (status == TWEP_WR_OK && out_response_cbor->len > ctx->max_response_bytes) {
         twep_wr_free_bytes(*out_response_cbor);
@@ -134,9 +141,9 @@ twep_wr_status_t twep_wr_set_host_io(
     }
     if (host_io == NULL) {
         memset(&ctx->host_io, 0, sizeof(ctx->host_io));
-        return TWEP_WR_OK;
+    } else {
+        ctx->host_io = *host_io;
     }
-    ctx->host_io = *host_io;
     return TWEP_WR_OK;
 }
 
@@ -147,10 +154,17 @@ void twep_wr_free_bytes(twep_wr_owned_bytes_t bytes)
 
 void twep_wr_shutdown(twep_wr_context_t *ctx)
 {
-    if (ctx != NULL && ctx->runtime_initialized) {
-        wasm_runtime_destroy();
-        ctx->runtime_initialized = false;
+    if (ctx == NULL) {
+        return;
     }
+#if defined(TWEP_WR_PLATFORM_BACKEND_LINUX)
+    if (ctx->backend_state != NULL) {
+        wasm_runtime_destroy();
+    }
+#elif defined(TWEP_WR_PLATFORM_BACKEND_SGX)
+    twep_wr_sgx_shutdown(ctx->backend_state);
+#endif
+    ctx->backend_state = NULL;
     free(ctx->attestam_url);
     free(ctx->resolver_mode);
     free(ctx->state_dir);
@@ -591,6 +605,7 @@ bool twep_wr_sha256_matches(const uint8_t *bytes, size_t len, const uint8_t expe
     return memcmp(actual, expected, SHA256_DIGEST_LENGTH) == 0;
 }
 
+#ifndef TWEP_WR_NO_REE_WAMR
 twep_wr_status_t twep_wr_call_u32_no_args(wasm_exec_env_t exec_env, wasm_module_inst_t module_inst,
                                           const char *name, uint32_t *out_value)
 {
@@ -619,3 +634,4 @@ twep_wr_status_t twep_wr_call_free(wasm_exec_env_t exec_env, wasm_module_inst_t 
     }
     return TWEP_WR_OK;
 }
+#endif

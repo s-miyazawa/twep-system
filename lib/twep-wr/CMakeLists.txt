@@ -11,6 +11,8 @@ endif()
 string(TOLOWER ${CMAKE_HOST_SYSTEM_NAME} WAMR_BUILD_PLATFORM)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)")
   set(WAMR_BUILD_TARGET "AARCH64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|armv[0-9])")
+  set(WAMR_BUILD_TARGET "ARM")
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64")
   set(WAMR_BUILD_TARGET "RISCV64")
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -64,7 +66,8 @@ elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
         ${TWEP_WR_OPTEE_PROFILE_SOURCE}
   )
 elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "sgx")
-  set(TWEP_WR_PLATFORM_SOURCE src/platform/sgx/platform_sgx.c)
+  message(FATAL_ERROR
+    "TWEP_WR_PLATFORM_BACKEND=sgx is unavailable until the complete secure SGX runtime layer")
 elseif(TWEP_WR_PLATFORM_BACKEND STREQUAL "keystone")
   set(TWEP_WR_PLATFORM_SOURCE src/platform/keystone/platform_keystone.c)
 else()
@@ -94,6 +97,10 @@ target_include_directories(twep_wr PRIVATE
   ${WAMR_ROOT_DIR}/core/iwasm/include
 )
 
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "linux")
+  target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_LINUX=1)
+endif()
+
 if(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
    TWEP_WR_PLATFORM_BACKEND STREQUAL "riscv-optee")
   target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_OPTEE=1)
@@ -109,6 +116,17 @@ if(TWEP_WR_PLATFORM_BACKEND STREQUAL "arm-optee" OR
   target_link_directories(twep_wr PRIVATE ${TWEP_WR_TEEC_LIB_DIR})
   target_link_options(twep_wr PRIVATE "LINKER:--allow-shlib-undefined")
   target_link_libraries(twep_wr PRIVATE teec)
+endif()
+
+if(TWEP_WR_PLATFORM_BACKEND STREQUAL "keystone")
+  target_compile_definitions(twep_wr PRIVATE TWEP_WR_PLATFORM_BACKEND_KEYSTONE=1)
+  enable_testing()
+  add_executable(platform_stub_test tests/platform_stub_test.c)
+  target_include_directories(platform_stub_test PRIVATE include src)
+  target_compile_features(platform_stub_test PRIVATE c_std_11)
+  target_compile_options(platform_stub_test PRIVATE -Wall -Wextra -Werror)
+  target_link_libraries(platform_stub_test PRIVATE twep_wr)
+  add_test(NAME platform_stub_test COMMAND platform_stub_test)
 endif()
 
 target_compile_features(twep_wr PRIVATE c_std_11)
